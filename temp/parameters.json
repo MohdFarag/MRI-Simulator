@@ -1,0 +1,16 @@
+{
+    "TR": 0,
+    "TE": 0,
+    "RF": [
+    ],
+    "Gradient": [
+    ],
+    "Multi_gradient": [
+    ],
+    "Readout": {
+        "d_readout": 0,
+        "d_ramp": 0,
+        "d_encoding": 0,
+        "area_factor": 0
+    }
+}
