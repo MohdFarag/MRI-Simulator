@@ -57,8 +57,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.sequence_viewer.setFocusPolicy(QtCore.Qt.ClickFocus)
         sequence_layout.addWidget(self.sequence_viewer)
         #### Run Button
-        run_button = QtWidgets.QPushButton("Run")
-        sequence_layout.addWidget(run_button)
+        self.run_button = QtWidgets.QPushButton("Run")
+        sequence_layout.addWidget(self.run_button)
 
         ###############################
         
@@ -131,6 +131,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # Connect signals and slots         
     def connect(self):
         self.mode_selector.currentIndexChanged.connect(self.change_mode)
+        self.run_button.clicked.connect(self.run_sequence)
 
     # Create the menu bar
     def create_menu(self):
@@ -139,11 +140,11 @@ class MainWindow(QtWidgets.QMainWindow):
         file_menu = menu_bar.addMenu("File")
 
         open_phantom_action = QtWidgets.QAction("Open Phantom", self)
-        open_phantom_action.setShortcut("Ctrl+o")
+        open_phantom_action.setShortcut("Ctrl+p")
         open_phantom_action.triggered.connect(self.open_phantom)
 
         open_sequence_action = QtWidgets.QAction("Open Sequence", self)
-        open_sequence_action.setShortcut("Ctrl+i")
+        open_sequence_action.setShortcut("Ctrl+s")
         open_sequence_action.triggered.connect(self.open_sequence)
 
         file_menu.addAction(open_phantom_action)
@@ -190,6 +191,10 @@ class MainWindow(QtWidgets.QMainWindow):
     # Change mode showed
     def change_mode(self, index):
         self.phantom_viewer.changeAttribute(index)
+    
+    # Run the sequence
+    def run_sequence(self):
+        sequence = self.sequence_viewer.getSequenceBasedOnTime()
     
     # Close the application
     def closeEvent(self, QCloseEvent):
