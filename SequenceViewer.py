@@ -1,14 +1,16 @@
-""" Phantom Viewer Class"""
-
-# pylint: disable=C0103, W0105, C0301, W0613, E1136
+""" Sequence Viewer Class"""
 
 # math & matrix computations library
 import numpy as np
-
-import mrsd
 import math
+
+# MRI Sequence Diagram Library
+import mrsd
+
+# Json library
 import json
 
+# Viewer
 from viewer import viewer
 
 # Phantom for testing
@@ -26,10 +28,8 @@ class SequenceViewer(viewer):
         
         # Initialize the figure
         self.diagram = mrsd.Diagram(
-            self.axes, ["RF", "$G_{SS}$", "$G_{PE}$", "$G_{FE}$", "Echo signal"])
-        
-        self.setData("./Tests/parametersTest2.json")
-        
+            self.axes, ["RF", "$G_{SS}$", "$G_{PE}$", "$G_{FE}$", "Signal"])
+                
     # Set Theme
     def setTheme(self):
         super().setTheme()
@@ -54,7 +54,8 @@ class SequenceViewer(viewer):
         #################### Read Json File ####################
         with open(path, 'r') as file:
             params = json.load(file)
-        
+            self.setSequenceBasedOnTime(params) # Set Sequence List Based On Time
+
         #################### Update the parameters with JSON data ####################
         TE = params.get('TE')
         TR = params.get('TR')
@@ -63,10 +64,10 @@ class SequenceViewer(viewer):
         Readout = params['Readout']
         
         # Readout parameters
-        duration = Readout.get('Duration')
+        duration = Readout.get('d_readout')
         if duration:
             adc, echo, readout = self.diagram.readout(
-                "Echo signal", "$G_{FE}$", duration, ramp=0.2, center=TE,
+                "Signal", "$G_{FE}$", duration, ramp=0.2, center=TE,
                 adc_kwargs={"ec": "0.5"})
             self.diagram.add("$G_{FE}$", readout.adapt(2, -0.5, 0.2, end=readout.begin))
             
@@ -86,7 +87,6 @@ class SequenceViewer(viewer):
             self.add_multi_gradient(self.diagram, gradient)
 
         ################# Add Intervals #################
-        # add flip angles and TE/TR intervals
         self.add_intervals(self.diagram, TE, TR)
 
         self.draw()
@@ -96,7 +96,7 @@ class SequenceViewer(viewer):
         super().clearData()
         self.timeBasedSequence = list()
         self.diagram = mrsd.Diagram(
-            self.axes, ["RF", "$G_{SS}$", "$G_{PE}$", "$G_{FE}$", "Echo signal"])
+            self.axes, ["RF", "$G_{SS}$", "$G_{PE}$", "$G_{FE}$", "Signal"])
 
     ###############################################
     """Sequence Functions"""
@@ -122,13 +122,10 @@ class SequenceViewer(viewer):
         axis = gradient.get('Axis')
         if (axis == "y"):
             diagram.gradient("$G_{PE}$", duration, amplitude, center=time)
-            self.timeBasedSequence.append(("Gy", time))
         elif (axis == "x"):
             diagram.gradient("$G_{FE}$", duration, amplitude, center=time)
-            self.timeBasedSequence.append(("Gx", time))
         elif (axis == "z"):
             diagram.gradient("$G_{SS}$", duration, amplitude, center=time)
-            self.timeBasedSequence.append(("Gz", time))
 
     # Add multi gradient
     def add_multi_gradient(self, diagram:mrsd.Diagram, gradient):
@@ -137,13 +134,10 @@ class SequenceViewer(viewer):
         axis = gradient.get('Axis')
         if (axis == "y"):
             diagram.multi_gradient("$G_{PE}$", 1.75, 0.75, 0.1, center = Time)
-            self.timeBasedSequence.append(("multi Gy", Time))
         elif (axis == "x"):
             diagram.multi_gradient("$G_{FE}$", 1.75, 0.75, 0.1, center = Time)
-            self.timeBasedSequence.append(("multi Gx", Time))
         elif (axis == "z"):
             diagram.multi_gradient("$G_{SS}$", 1.75, 0.75, 0.1, center = Time)
-            self.timeBasedSequence.append(("multi Gz", Time))
 
     # Add RF
     def add_intervals(self, diagram:mrsd.Diagram, TE=0, TR=0):
@@ -151,7 +145,47 @@ class SequenceViewer(viewer):
             diagram.interval(0, TE, -1.0, "TE")
         if TR != 0 :
             diagram.interval(0, TR, -2.0, "TR")
-            
+    
+    # Set Sequence Based On Time
+    def setSequenceBasedOnTime(self, sequence):
+        # Get parameters
+        RF = sequence['RF']
+        gradient = sequence['Gradient']
+        multi_gradient = sequence['Multi_gradient']
+        TE = sequence['TE']
+        TR = sequence['TR']
+
+        # RF
+        for item in RF:
+            Time = item.get('Time')
+            Duration = item.get('Duration')
+            FA = item.get("FA")
+            Sign = item.get("Sign")
+            self.timeBasedSequence.append(("RF",Time,Duration,FA,Sign))
+        
+        # Gradient
+        for item in gradient:
+            Time = item.get('Time')
+            Duration = item.get('Duration')
+            Amp = item.get("Amp")
+            Axis = item.get('Axis')
+            Sign = item.get("Sign")
+            self.timeBasedSequence.append(("Gr",Time,Duration,Amp,Axis,Sign))
+        
+        # Multi Gradient
+        for item in multi_gradient:
+            Time = item.get('Time')
+            Amp = item.get("Amp")
+            Axis = item.get('Axis')
+            Sign = item.get("Sign")
+            self.timeBasedSequence.append(("MGR",Time,Amp,Axis,Sign))
+
+        def getTime(comp):  
+            return comp[1]
+
+        self.timeBasedSequence.sort(reverse=False, key=getTime)
+
+    # Get Sequence Based On Time
     def getSequenceBasedOnTime(self):
         return self.timeBasedSequence
     

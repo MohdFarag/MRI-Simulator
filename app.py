@@ -4,8 +4,13 @@ from PyQt5.QtWidgets import QFileDialog
 
 # Matplotlib
 from PhantomViewer import PhantomViewer
+from Phantom import Phantom
 from SequenceViewer import SequenceViewer
 from ImageViewer import ImageViewer
+
+# Numpy
+import numpy as np
+import math
 
 # Main Window
 class MainWindow(QtWidgets.QMainWindow):
@@ -194,8 +199,35 @@ class MainWindow(QtWidgets.QMainWindow):
     
     # Run the sequence
     def run_sequence(self):
+        # Get phantom to simulate
+        phantom = self.phantom_viewer.getPhantom()
+        # Get sequence based on time
         sequence = self.sequence_viewer.getSequenceBasedOnTime()
+        
+        for element in sequence:
+            if element[0] == "RF":
+                pass
     
+    """MRI Functions"""
+    def relaxation(self, phantom:Phantom, t:float):
+        """
+        Simulate T1 and T2 relaxation of magnetization.
+        
+        Parameters:
+        phantom (Phantom): Phantom object.
+        t (float): Time elapsed since excitation.
+        
+        Returns:
+        phantom (Phantom): Phantom object.
+        """
+        for i in range(phantom.width):
+            for j in range(phantom.height):
+                phantom.M[i][j][0] = phantom.M[i][j][0] * math.exp(-t / phantom.T2[i][j])
+                phantom.M[i][j][1] = phantom.M[i][j][1] * math.exp(-t / phantom.T2[i][j])
+                phantom.M[i][j][2] = phantom.PD * (1 - math.exp(-t / phantom.T1[i][j]))
+                
+        return phantom
+       
     # Close the application
     def closeEvent(self, QCloseEvent):
         super().closeEvent(QCloseEvent)

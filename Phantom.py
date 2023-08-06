@@ -37,32 +37,32 @@ class Phantom():
     def setRandomData(self, w, h, image):            
         for i in range(w):
             for j in range(h):
-                self.M[i][j] = (0,0,1)
-                self.PD[i][j] = image[i][j]
-
-                if 0 <= image[i][j] < 25:
-                    self.T1[i][j] = 4.0
-                    self.T2[i][j] = 2.0
+                self.PD[i][j] = image[i][j]*255                 
+                self.M[i][j] = (0, 0, self.PD[i][j])
+                
+                if 0 <= self.PD[i][j] < 25:
+                    self.T1[i][j] = 3500
+                    self.T2[i][j] = 2000
                     self.DeltaB[i][j] = 0.5
-                elif 25 <= image[i][j] < 51:
-                    self.T1[i][j] = 0.9
-                    self.T2[i][j] = 0.05
-                    self.DeltaB[i][j] = 0.02
-                elif 51 <= image[i][j] < 76:
-                    self.T1[i][j] = 0.5
-                    self.T2[i][j] = 0.04
-                    self.DeltaB[i][j] = 0.02
-                elif  76 <= image[i][j] < 101:
-                    self.T1[i][j] = 0.25
-                    self.T2[i][j] = 0.07
-                    self.DeltaB[i][j] = 0.03
-                elif 101 <= image[i][j] < 255:
-                    self.T1[i][j] = 0.25
-                    self.T2[i][j] = 0.02
-                    self.DeltaB[i][j] = 0.005
+                elif 25 <= self.PD[i][j] < 51:
+                    self.T1[i][j] = 1000
+                    self.T2[i][j] = 120
+                    self.DeltaB[i][j] = 10
+                elif 51 <= self.PD[i][j] < 76:
+                    self.T1[i][j] = 400
+                    self.T2[i][j] = 30
+                    self.DeltaB[i][j] = 20
+                elif  76 <= self.PD[i][j] < 101:
+                    self.T1[i][j] = 1500
+                    self.T2[i][j] = 1000
+                    self.DeltaB[i][j] = 30
+                elif 101 <= self.PD[i][j] < 255:
+                    self.T1[i][j] = 250
+                    self.T2[i][j] = 10
+                    self.DeltaB[i][j] = 5
                 else:
-                    self.T1[i][j] = 0.4
-                    self.T2[i][j] = 0.01
-                    self.DeltaB[i][j] = 0.005
+                    self.T1[i][j] = 1200
+                    self.T2[i][j] = 550
+                    self.DeltaB[i][j] = 15
                     
         self.T2s = 1/((1/self.T2) + self.DeltaB)

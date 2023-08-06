@@ -17,6 +17,7 @@ class ImageViewer(viewer):
     """
     def __init__(self, parent=None, axisExisting=False, axisColor="#fff", title=""):
         super(ImageViewer, self).__init__(parent, axisExisting, axisColor, title)
+        self.image = list()
                         
     # Set Theme
     def setTheme(self):
@@ -35,8 +36,14 @@ class ImageViewer(viewer):
         super().setData(path)
 
         # Reading the image
-        image = mpimg.imread(path)
-    
+        self.image = mpimg.imread(path)
+        
+        # Draw the image        
+        self.drawData(self.image, title=self.title)
+
+        
     # Reset figure and variables
     def reset(self):
         super().reset()
+
+    ###############################################
