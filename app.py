@@ -141,7 +141,12 @@ class MainWindow(QtWidgets.QMainWindow):
         # Connect signals and slots
         self.connect()
         
-        self.load_phantom("./Resources/Phantoms/phantom.png")
+        # Test
+        self.Test_1()
+        
+    def Test_1(self):
+        # self.phantom_viewer.setGradient(8)
+        self.phantom_viewer.setSheppLogan(8)
         self.load_sequence("./Resources/Sequences/gre_profile.json")
     
     # Connect signals and slots         
@@ -211,61 +216,62 @@ class MainWindow(QtWidgets.QMainWindow):
     # Run the sequence
     def run_sequence(self):
         # Get phantom to simulate
-        phantom = self.phantom_viewer.getPhantom()
-        N = phantom.width
-        
+        phantom = self.phantom_viewer.getPhantom() # Phantom object [M, T1, T2, PD]
+        N = phantom.width # Phantom size
+                
         # Get sequence based on time
-        sequence = self.sequence_viewer.getSequenceBasedOnTime()
-        print(sequence)
+        sequence = self.sequence_viewer.getSequenceBasedOnTime() # [(Time, Type, Duration, FA, Sign), ...]
         
         # Simulate the sequence
         ## Generate k space
-        k_space_result = np.zeros((N, N))
-        intervals = np.linspace(0, 360, N)
-        angles = np.linspace(-0.5, 0.5, N, endpoint=False)
+        k_space_result = np.zeros((N, N)) # Initialize an NxN complex array with zeros
+
+        angles = np.linspace(0, 360, N) # Angles that will be used to generate the phase shifts
+        gradient_indices = np.linspace(-N//2, N//2, N) # Indices of the k-space matrix
         
-        i = 0
-        y_gradient = 0
-        while y_gradient < N-1:
-            x_gradient = 0
-            for seq in sequence:   
-                component = seq[1]
-
-                if component == "RF":
+        pe_gradient = -1
+        while pe_gradient < N-1:
+            fe_gradient = 0
+            for component in sequence:
+                # Get Component Type
+                component_type = component[1]
+                if component_type == "RF":
+                    # If component type is RF
                     for x in range(N):
                         for y in range(N):
-                            FA = seq[3]
-                            phantom.M[x][y] = np.round(self.apply_rf_pulse(phantom.M[x][y], FA))
+                            # Get Flip Angle
+                            flip_angle = component[3]
+                            # Apply RF pulse by specific flip angle
+                            phantom.M[x][y] = np.round(self.rotation(phantom.M[x][y], flip_angle))
 
-                elif component == "MGR":
-                    if seq[3] == 'y':
-                        y_gradient += 1
-                    elif seq[3] == 'x':
-                        x_gradient += 1
-
-                elif component == "Gr":
-                    if seq[4] == 'y':
-                        y_gradient += 1
-                    elif seq[4] == 'x':
-                        x_gradient += 1
-
-                elif component == "DE":
+                elif component_type == "DE":
+                    # If component type is Delay            
                     for x in range(N):
                         for y in range(N):
-                            t = seq[2]
+                            t = component[2]
                             phantom.M[x][y] = self.relaxation(phantom.M[x][y], t, phantom.T1[x][y], phantom.T2[x][y], phantom.PD[x][y])
 
-                if component == "RO":
-                    while x_gradient < N:
-                        phase_shift_x = np.exp(-1j * (np.radians(angles[x_gradient]) * x_gradient))
-                        phase_shift_y = np.exp(-1j * (np.radians(angles[y_gradient]) * y_gradient))
-                        phase_shift = phase_shift_x * phase_shift_y
-                        k_space_result[x_gradient][y_gradient] = np.sum(phantom.M * phase_shift)
-
-                        x_gradient += 1
-
-                i += 1
+                elif component_type == "MGR":
+                    # If component type is Multi Gradient
+                    pe_gradient += 1
+                    for x in range(N):
+                        for y in range(N):
+                            # Get Flip Angle
+                            axis = component[3]
+                            # Apply RF pulse by specific flip angle
+                            phantom.M[x][y] = self.rotation(phantom.M[x,y], angles[pe_gradient], axis)
+                            
+                elif component_type == "Gr":
+                    # If component type is Gradient
+                    fe_gradient += 1
+                            
+                elif component_type == "RO":
+                    # If component type is Readout
+                    while fe_gradient < N:                       
+                        k_space_result[fe_gradient][pe_gradient] = np.sum(phantom.PD + phantom.M * 1j)
+                        fe_gradient += 1
             
+            k_space_result = np.fft.fftshift(k_space_result)
             self.k_space_viewer.drawData(k_space_result, "K Space")
         
         ## Generate output
@@ -277,21 +283,12 @@ class MainWindow(QtWidgets.QMainWindow):
             self.output_viewer_1.drawData(result_image, "Output 1")
         elif self.choose_output_2.isChecked():
             self.output_viewer_2.drawData(result_image, "Output 2")
-    
-    """MRI Functions"""
-    
+
+        print(phantom.M[N//2][N//2])
+
+    """MRI Functions"""    
     # Apply an RF pulse to a magnetization vector
-    def apply_rf_pulse(self, magnetization_vector, flip_angle_deg):
-        """
-        Apply an RF pulse to a magnetization vector.
-        
-        Args:
-        magnetization (tuple): Tuple representing the initial magnetization vector (x, y, z).
-        flip_angle_deg (float): Desired flip angle of the RF pulse in degrees.
-        
-        Returns:
-        tuple: Final magnetization vector after applying the RF pulse.
-        """
+    def rotation(self, magnetization_vector, flip_angle_deg, axis="x"):
         # Convert flip angle from degrees to radians        
         flip_angle_rad = np.radians(flip_angle_deg)
 
@@ -299,17 +296,24 @@ class MainWindow(QtWidgets.QMainWindow):
         cos_theta = np.cos(flip_angle_rad)
         sin_theta = np.sin(flip_angle_rad)
         
-        # Construct the rotation matrix around x-axis
-        rotation_matrix = np.array([[1, 0, 0],
-                                    [0, cos_theta, sin_theta],
-                                    [0, -sin_theta, cos_theta]])
+        if axis == "x":
+            # Construct the rotation matrix around x-axis
+            rotation_matrix = np.array([[1,      0,                  0],
+                                        [0,      cos_theta,  sin_theta],
+                                        [0,     -sin_theta,  cos_theta]])
+        elif axis == "y":
+            rotation_matrix = np.array([[cos_theta,  0,  -sin_theta],
+                                        [0,          1,           0],
+                                        [sin_theta,  0,   cos_theta]])
+        elif axis == "z":
+            rotation_matrix = np.array([[cos_theta,  sin_theta, 0],
+                                        [-sin_theta, cos_theta, 0],
+                                        [0,          0,         1]])
+            
 
         # Apply rotation to the magnetization vector
-        new_magnetization = np.dot(rotation_matrix, magnetization_vector)
-        
-        # Apply the RF pulse by multiplying the rotation matrix with the initial magnetization vector
-        
-        return new_magnetization
+        new_magnetization_vector = np.dot(rotation_matrix, magnetization_vector)
+        return new_magnetization_vector
     
     def relaxation(self, magnetization_vector, t:float, t1:float, t2:float, PD:float):
         """

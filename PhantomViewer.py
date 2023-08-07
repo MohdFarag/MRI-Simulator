@@ -54,26 +54,49 @@ class PhantomViewer(viewer):
     def setData(self, path:str):       
         super().setData(path)
 
-        # # Reading the image
-        # image = mpimg.imread(path)
+        # Reading the image
+        image = mpimg.imread(path)
 
-        # if image.ndim > 2:
-        #     image = image[:,:,0]
-        # else:
-        #     image = image
+        if image.ndim > 2:
+            image = image[:,:,0]
+        else:
+            image = image
 
-        # image = np.array([[0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
-        #             [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
-        #             [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4],
-        #             [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4],
-        #             [0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6],
-        #             [0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6],
-        #             [0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8],
-        #             [0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8],
-        #             [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-        #             [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]])
+        self.phantom.setImage(image)
+        self.drawData(self.phantom.PD, title="Protein Density")
 
-        image = shepp_logan(16)
+    def setSheppLogan(self, N:int):       
+        image = shepp_logan(N)
+
+        if image.ndim > 2:
+            image = image[:,:,0]
+        else:
+            image = image
+
+        self.phantom.setImage(image)
+        self.drawData(self.phantom.PD, title="Protein Density")
+
+    # Generate gradient
+    def generate_gradient(self, N, color1=0, color2=255, direction="horizontal"):
+        image = np.zeros((N, N), dtype=np.uint8)
+        
+        if direction == "horizontal":
+            for x in range(N):
+                image[:, x] = int(color1 * (1 - x / N) + color2 * (x / N))
+        elif direction == "vertical":
+            for y in range(N):
+                image[y, :] = int(color1 * (1 - y / N) + color2 * (y / N))
+        
+        return image
+
+    def setGradient(self, N:int):       
+        image = self.generate_gradient(N)
+
+        if image.ndim > 2:
+            image = image[:,:,0]
+        else:
+            image = image
+
         self.phantom.setImage(image)
         self.drawData(self.phantom.PD, title="Protein Density")
         
