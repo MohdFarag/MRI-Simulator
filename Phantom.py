@@ -18,27 +18,26 @@ class Phantom():
     # Set Data
     def setImage(self, image:np.ndarray):
         if image.ndim == 2:
-            width  = image.shape[0]
-            height = image.shape[1]
+            self.width  = image.shape[0]
+            self.height = image.shape[1]
         else:
-            width = 0
-            height = 0
+            self.width = 0
+            self.height = 0
 
-        self.M = np.zeros((width, height, 3))                # Magnetization vector
+        self.M = np.zeros((self.width, self.height, 3))                # Magnetization vector
         self.T1 = np.zeros(image.shape)                      # T1
         self.T2 = np.zeros(image.shape)                      # T2
         self.T2s = np.zeros(image.shape)                     # T2*
         self.PD = np.zeros(image.shape)                      # Protein Density
         self.DeltaB = np.zeros(image.shape)                  # Delta B
         
-        # TODO: test
-        self.setRandomData(width, height, image)
+        self.setRandomData(self.width, self.height, image)
                         
     def setRandomData(self, w, h, image):            
         for i in range(w):
             for j in range(h):
-                self.PD[i][j] = image[i][j]*255                 
-                self.M[i][j] = (0, 0, self.PD[i][j])
+                self.PD[i][j] = image[i][j]*255     
+                self.M[i][j] = (0, 0, 1)
                 
                 if 0 <= self.PD[i][j] < 25:
                     self.T1[i][j] = 3500

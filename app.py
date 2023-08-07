@@ -61,9 +61,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.sequence_viewer.setCursor(QtGui.QCursor())
         self.sequence_viewer.setFocusPolicy(QtCore.Qt.ClickFocus)
         sequence_layout.addWidget(self.sequence_viewer)
-        #### Run Button
+        #### Control Layout
+        control_layout = QtWidgets.QHBoxLayout()
+        sequence_layout.addLayout(control_layout)
+        ##### Radio Buttons
+        self.choose_output_1 = QtWidgets.QRadioButton("Output 1",checked=True)
+        self.choose_output_2 = QtWidgets.QRadioButton("Output 2")
+        control_layout.addWidget(self.choose_output_1, 1)
+        control_layout.addWidget(self.choose_output_2, 1)
+        ##### Run Button
         self.run_button = QtWidgets.QPushButton("Run")
-        sequence_layout.addWidget(self.run_button)
+        control_layout.addWidget(self.run_button,2)
 
         ###############################
         
@@ -132,6 +140,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Connect signals and slots
         self.connect()
+        
+        self.load_phantom("./Resources/Phantoms/phantom.png")
+        self.load_sequence("./Resources/Sequences/gre_profile.json")
     
     # Connect signals and slots         
     def connect(self):
@@ -201,15 +212,106 @@ class MainWindow(QtWidgets.QMainWindow):
     def run_sequence(self):
         # Get phantom to simulate
         phantom = self.phantom_viewer.getPhantom()
+        N = phantom.width
+        
         # Get sequence based on time
         sequence = self.sequence_viewer.getSequenceBasedOnTime()
+        print(sequence)
         
-        for element in sequence:
-            if element[0] == "RF":
-                pass
+        # Simulate the sequence
+        ## Generate k space
+        k_space_result = np.zeros((N, N))
+        intervals = np.linspace(0, 360, N)
+        angles = np.linspace(-0.5, 0.5, N, endpoint=False)
+        
+        i = 0
+        y_gradient = 0
+        while y_gradient < N-1:
+            x_gradient = 0
+            for seq in sequence:   
+                component = seq[1]
+
+                if component == "RF":
+                    for x in range(N):
+                        for y in range(N):
+                            FA = seq[3]
+                            phantom.M[x][y] = np.round(self.apply_rf_pulse(phantom.M[x][y], FA))
+
+                elif component == "MGR":
+                    if seq[3] == 'y':
+                        y_gradient += 1
+                    elif seq[3] == 'x':
+                        x_gradient += 1
+
+                elif component == "Gr":
+                    if seq[4] == 'y':
+                        y_gradient += 1
+                    elif seq[4] == 'x':
+                        x_gradient += 1
+
+                elif component == "DE":
+                    for x in range(N):
+                        for y in range(N):
+                            t = seq[2]
+                            phantom.M[x][y] = self.relaxation(phantom.M[x][y], t, phantom.T1[x][y], phantom.T2[x][y], phantom.PD[x][y])
+
+                if component == "RO":
+                    while x_gradient < N:
+                        phase_shift_x = np.exp(-1j * (np.radians(angles[x_gradient]) * x_gradient))
+                        phase_shift_y = np.exp(-1j * (np.radians(angles[y_gradient]) * y_gradient))
+                        phase_shift = phase_shift_x * phase_shift_y
+                        k_space_result[x_gradient][y_gradient] = np.sum(phantom.M * phase_shift)
+
+                        x_gradient += 1
+
+                i += 1
+            
+            self.k_space_viewer.drawData(k_space_result, "K Space")
+        
+        ## Generate output
+        ### Make inverse fourier transform
+        result_image = np.fft.ifft2(k_space_result)
+        
+        # Draw the result
+        if self.choose_output_1.isChecked():
+            self.output_viewer_1.drawData(result_image, "Output 1")
+        elif self.choose_output_2.isChecked():
+            self.output_viewer_2.drawData(result_image, "Output 2")
     
     """MRI Functions"""
-    def relaxation(self, phantom:Phantom, t:float):
+    
+    # Apply an RF pulse to a magnetization vector
+    def apply_rf_pulse(self, magnetization_vector, flip_angle_deg):
+        """
+        Apply an RF pulse to a magnetization vector.
+        
+        Args:
+        magnetization (tuple): Tuple representing the initial magnetization vector (x, y, z).
+        flip_angle_deg (float): Desired flip angle of the RF pulse in degrees.
+        
+        Returns:
+        tuple: Final magnetization vector after applying the RF pulse.
+        """
+        # Convert flip angle from degrees to radians        
+        flip_angle_rad = np.radians(flip_angle_deg)
+
+        # Compute the sine and cosine of the flip angle
+        cos_theta = np.cos(flip_angle_rad)
+        sin_theta = np.sin(flip_angle_rad)
+        
+        # Construct the rotation matrix around x-axis
+        rotation_matrix = np.array([[1, 0, 0],
+                                    [0, cos_theta, sin_theta],
+                                    [0, -sin_theta, cos_theta]])
+
+        # Apply rotation to the magnetization vector
+        new_magnetization = np.dot(rotation_matrix, magnetization_vector)
+        
+        # Apply the RF pulse by multiplying the rotation matrix with the initial magnetization vector
+        
+        return new_magnetization
+    
+    def relaxation(self, magnetization_vector, t:float, t1:float, t2:float, PD:float):
         """
         Simulate T1 and T2 relaxation of magnetization.
         
@@ -220,13 +322,17 @@ class MainWindow(QtWidgets.QMainWindow):
         Returns:
         phantom (Phantom): Phantom object.
         """
-        for i in range(phantom.width):
-            for j in range(phantom.height):
-                phantom.M[i][j][0] = phantom.M[i][j][0] * math.exp(-t / phantom.T2[i][j])
-                phantom.M[i][j][1] = phantom.M[i][j][1] * math.exp(-t / phantom.T2[i][j])
-                phantom.M[i][j][2] = phantom.PD * (1 - math.exp(-t / phantom.T1[i][j]))
-                
-        return phantom
+        E1 = np.exp(-t/t1)
+        E2 = np.exp(-t/t2)
+        M0 = 1
+        
+        mat1 = np.array([[E2, 0, 0],
+                         [0, E2, 0],
+                         [0, 0, E1]])
+        mat2 = np.array([0, 0, M0*(1-E1)])
+        magnetization_vector = np.matmul(mat1, magnetization_vector) + mat2
+        
+        return magnetization_vector
        
     # Close the application
     def closeEvent(self, QCloseEvent):

@@ -161,7 +161,7 @@ class SequenceViewer(viewer):
             Duration = item.get('Duration')
             FA = item.get("FA")
             Sign = item.get("Sign")
-            self.timeBasedSequence.append(("RF",Time,Duration,FA,Sign))
+            self.timeBasedSequence.append((Time, "RF", Duration, FA, Sign))
         
         # Gradient
         for item in gradient:
@@ -170,7 +170,7 @@ class SequenceViewer(viewer):
             Amp = item.get("Amp")
             Axis = item.get('Axis')
             Sign = item.get("Sign")
-            self.timeBasedSequence.append(("Gr",Time,Duration,Amp,Axis,Sign))
+            self.timeBasedSequence.append((Time, "Gr", Duration, Amp, Axis, Sign))
         
         # Multi Gradient
         for item in multi_gradient:
@@ -178,10 +178,23 @@ class SequenceViewer(viewer):
             Amp = item.get("Amp")
             Axis = item.get('Axis')
             Sign = item.get("Sign")
-            self.timeBasedSequence.append(("MGR",Time,Amp,Axis,Sign))
+            
+            self.timeBasedSequence.append((Time, "MGR", Amp, Axis, Sign))
 
-        def getTime(comp):  
-            return comp[1]
+        self.timeBasedSequence.append((TE, "RO"))
+
+        delayList = []
+        for i, item in enumerate(self.timeBasedSequence):
+            if i < len(self.timeBasedSequence)-1:
+                delayDuration = self.timeBasedSequence[i+1][0] - self.timeBasedSequence[i][0]
+                if delayDuration != 0:
+                    Time = self.timeBasedSequence[i][0] + 0.1
+                    delayList.append((Time, "DE", delayDuration))
+                    
+        self.timeBasedSequence.extend(delayList)
+                
+        def getTime(comp):
+            return comp[0]
 
         self.timeBasedSequence.sort(reverse=False, key=getTime)
 

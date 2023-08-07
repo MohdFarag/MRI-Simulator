@@ -11,6 +11,7 @@ from viewer import viewer
 
 # Phantom for testing
 from Phantom import Phantom
+from phantominator import shepp_logan
 
 PD_ATTRIBUTE = 0
 T1_ATTRIBUTE = 1
@@ -53,14 +54,26 @@ class PhantomViewer(viewer):
     def setData(self, path:str):       
         super().setData(path)
 
-        # Reading the image
-        image = mpimg.imread(path)
+        # # Reading the image
+        # image = mpimg.imread(path)
 
-        if image.ndim > 2:
-            image = image[:,:,0]
-        else:
-            image = image
-        
+        # if image.ndim > 2:
+        #     image = image[:,:,0]
+        # else:
+        #     image = image
+
+        # image = np.array([[0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+        #             [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+        #             [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4],
+        #             [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4],
+        #             [0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6],
+        #             [0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6],
+        #             [0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8],
+        #             [0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8],
+        #             [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        #             [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]])
+
+        image = shepp_logan(16)
         self.phantom.setImage(image)
         self.drawData(self.phantom.PD, title="Protein Density")
         
