@@ -1,16 +1,23 @@
 # PyQt5
 from PyQt5 import QtCore, QtWidgets, QtGui
 from PyQt5.QtWidgets import QFileDialog
+from Worker import SequenceWorker
 
 # Matplotlib
+import matplotlib.pyplot as plt
+
+# Viewers
 from PhantomViewer import PhantomViewer
-from Phantom import Phantom
 from SequenceViewer import SequenceViewer
 from ImageViewer import ImageViewer
+from Phantom import Phantom
 
 # Numpy
 import numpy as np
 import math
+
+import warnings
+warnings.filterwarnings("ignore")
 
 # Main Window
 class MainWindow(QtWidgets.QMainWindow):
@@ -20,7 +27,21 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__()
         self.setWindowTitle("Magnetic Resonance Imaging Simulator")
         self.setWindowIcon(QtGui.QIcon("assets/icon.ico"))
+        self.running = False
+                                       
+        # Initialize the UI
+        self.UI_init()
+         
+        # Add menu bar
+        self.create_menu()
+
+        # Connect signals and slots
+        self.connect()
         
+        # Test
+        self.Test_1()
+
+    def UI_init(self):
         # Create a central widget and set the layout
         central_widget = QtWidgets.QWidget()
         central_layout = QtWidgets.QHBoxLayout()
@@ -71,6 +92,14 @@ class MainWindow(QtWidgets.QMainWindow):
         control_layout.addWidget(self.choose_output_2, 1)
         ##### Run Button
         self.run_button = QtWidgets.QPushButton("Run")
+        self.run_button.setIcon(QtGui.QIcon("./assets/play.ico"))
+        self.run_button.setStyleSheet("""background-color: #4f4f4f;
+                                      font-size:15px; 
+                                      border-radius: 6px; 
+                                      border: 1px solid rgba(27, 31, 35, 0.15); 
+                                      padding: 5px 15px;
+                                      color: #dadada;
+                                      font-weight: bold;""")
         control_layout.addWidget(self.run_button,2)
 
         ###############################
@@ -134,25 +163,19 @@ class MainWindow(QtWidgets.QMainWindow):
         central_layout.addWidget(main_splitter)
         central_widget.setLayout(central_layout)
         self.setCentralWidget(central_widget)
-                        
-        # Add menu bar
-        self.create_menu()
 
-        # Connect signals and slots
-        self.connect()
-        
-        # Test
-        self.Test_1()
-        
     def Test_1(self):
-        # self.phantom_viewer.setGradient(8)
-        self.phantom_viewer.setSheppLogan(8)
+        N = 16
+        self.phantom_viewer.setSheppLogan(N)
+        # self.phantom_viewer.setGradient(N)
+        # self.phantom_viewer.setConstant(N,120)
+        # self.phantom_viewer.setArray([[0,1,2],[0,5,1],[4,3,7]])
         self.load_sequence("./Resources/Sequences/gre_profile.json")
     
     # Connect signals and slots         
     def connect(self):
         self.mode_selector.currentIndexChanged.connect(self.change_mode)
-        self.run_button.clicked.connect(self.run_sequence)
+        self.run_button.clicked.connect(self.run_button_event)
 
     # Create the menu bar
     def create_menu(self):
@@ -180,11 +203,11 @@ class MainWindow(QtWidgets.QMainWindow):
             filenames = file_dialog.selectedFiles()
             if len(filenames) > 0:
                 filename = filenames[0]
-                try:
-                    self.load_phantom(filename)
-                except Exception as e:
-                    print(e)
-                    QtWidgets.QMessageBox.critical(self, "Error", "Unable to open the phantom file.")
+                # try:
+                self.load_phantom(filename)
+                # except Exception as e:
+                #     print(e)
+                #     QtWidgets.QMessageBox.critical(self, "Error", "Unable to open the phantom file.")
 
     def open_sequence(self):
         file_dialog = QFileDialog()
@@ -194,12 +217,12 @@ class MainWindow(QtWidgets.QMainWindow):
             filenames = file_dialog.selectedFiles()
             if len(filenames) > 0:
                 filename = filenames[0]
-                try:
-                    self.load_sequence(filename)
-                except Exception as e:
-                    print(e)
-                    QtWidgets.QMessageBox.critical(self, "Error", "Unable to open the sequence file.")                    
-    
+                # try:
+                self.load_sequence(filename)
+                # except Exception as e:
+                #     print(e)
+                #     QtWidgets.QMessageBox.critical(self, "Error", "Unable to open the sequence file.")                    
+
     # Load the data
     def load_phantom(self, filename):
         # Set the image
@@ -213,131 +236,84 @@ class MainWindow(QtWidgets.QMainWindow):
     def change_mode(self, index):
         self.phantom_viewer.changeAttribute(index)
     
+    # Run Button
+    def run_button_event(self):
+        if self.running:
+            self.run_button.setText("Run")
+            self.run_button.setIcon(QtGui.QIcon("./assets/play.ico"))
+            self.pause_sequence()
+        else:
+            self.run_button.setText("Cancel")
+            self.run_button.setIcon(QtGui.QIcon("./assets/cancel.ico"))
+            self.run_sequence()
+            
+        self.running = not self.running
+
     # Run the sequence
     def run_sequence(self):
+        # Settings before running
+        self.choose_output_1.setEnabled(False)
+        self.choose_output_2.setEnabled(False)
+        
         # Get phantom to simulate
         phantom = self.phantom_viewer.getPhantom() # Phantom object [M, T1, T2, PD]
-        N = phantom.width # Phantom size
-                
+        N = phantom.width
+        
         # Get sequence based on time
-        sequence = self.sequence_viewer.getSequenceBasedOnTime() # [(Time, Type, Duration, FA, Sign), ...]
+        sequence = self.sequence_viewer.getSequenceBasedOnTime() # [(Time, Type, duration, flip_angle, Sign), ...]
+        print(sequence)
         
-        # Simulate the sequence
-        ## Generate k space
-        k_space_result = np.zeros((N, N)) # Initialize an NxN complex array with zeros
+        # Initialize the thread and worker
+        self.thread = QtCore.QThread()
+        self.worker = SequenceWorker(phantom, sequence, self.k_space_viewer)
 
-        angles = np.linspace(0, 360, N) # Angles that will be used to generate the phase shifts
-        gradient_indices = np.linspace(-N//2, N//2, N) # Indices of the k-space matrix
+        # Final resets
+        # Move worker to the thread
+        self.worker.moveToThread(self.thread)
         
-        pe_gradient = -1
-        while pe_gradient < N-1:
-            fe_gradient = 0
-            for component in sequence:
-                # Get Component Type
-                component_type = component[1]
-                if component_type == "RF":
-                    # If component type is RF
-                    for x in range(N):
-                        for y in range(N):
-                            # Get Flip Angle
-                            flip_angle = component[3]
-                            # Apply RF pulse by specific flip angle
-                            phantom.M[x][y] = np.round(self.rotation(phantom.M[x][y], flip_angle))
-
-                elif component_type == "DE":
-                    # If component type is Delay            
-                    for x in range(N):
-                        for y in range(N):
-                            t = component[2]
-                            phantom.M[x][y] = self.relaxation(phantom.M[x][y], t, phantom.T1[x][y], phantom.T2[x][y], phantom.PD[x][y])
-
-                elif component_type == "MGR":
-                    # If component type is Multi Gradient
-                    pe_gradient += 1
-                    for x in range(N):
-                        for y in range(N):
-                            # Get Flip Angle
-                            axis = component[3]
-                            # Apply RF pulse by specific flip angle
-                            phantom.M[x][y] = self.rotation(phantom.M[x,y], angles[pe_gradient], axis)
-                            
-                elif component_type == "Gr":
-                    # If component type is Gradient
-                    fe_gradient += 1
-                            
-                elif component_type == "RO":
-                    # If component type is Readout
-                    while fe_gradient < N:                       
-                        k_space_result[fe_gradient][pe_gradient] = np.sum(phantom.PD + phantom.M * 1j)
-                        fe_gradient += 1
-            
-            k_space_result = np.fft.fftshift(k_space_result)
-            self.k_space_viewer.drawData(k_space_result, "K Space")
+        # Connect signals and slots
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.worker.k_space_update.connect(self.k_space_update)
         
+        # Start the thread
+        self.thread.start()
+
         ## Generate output
-        ### Make inverse fourier transform
-        result_image = np.fft.ifft2(k_space_result)
-        
-        # Draw the result
-        if self.choose_output_1.isChecked():
-            self.output_viewer_1.drawData(result_image, "Output 1")
-        elif self.choose_output_2.isChecked():
-            self.output_viewer_2.drawData(result_image, "Output 2")
+        ### Draw the result
+        self.thread.finished.connect(self.output_update)                
 
-        print(phantom.M[N//2][N//2])
-
-    """MRI Functions"""    
-    # Apply an RF pulse to a magnetization vector
-    def rotation(self, magnetization_vector, flip_angle_deg, axis="x"):
-        # Convert flip angle from degrees to radians        
-        flip_angle_rad = np.radians(flip_angle_deg)
-
-        # Compute the sine and cosine of the flip angle
-        cos_theta = np.cos(flip_angle_rad)
-        sin_theta = np.sin(flip_angle_rad)
-        
-        if axis == "x":
-            # Construct the rotation matrix around x-axis
-            rotation_matrix = np.array([[1,      0,                  0],
-                                        [0,      cos_theta,  sin_theta],
-                                        [0,     -sin_theta,  cos_theta]])
-        elif axis == "y":
-            rotation_matrix = np.array([[cos_theta,  0,  -sin_theta],
-                                        [0,          1,           0],
-                                        [sin_theta,  0,   cos_theta]])
-        elif axis == "z":
-            rotation_matrix = np.array([[cos_theta,  sin_theta, 0],
-                                        [-sin_theta, cos_theta, 0],
-                                        [0,          0,         1]])
-            
-
-        # Apply rotation to the magnetization vector
-        new_magnetization_vector = np.dot(rotation_matrix, magnetization_vector)
-        return new_magnetization_vector
+    # Pause the sequence
+    def pause_sequence(self):
+        self.choose_output_1.setEnabled(True)
+        self.choose_output_2.setEnabled(True)
+        self.worker.pause()
     
-    def relaxation(self, magnetization_vector, t:float, t1:float, t2:float, PD:float):
-        """
-        Simulate T1 and T2 relaxation of magnetization.
+    @QtCore.pyqtSlot(np.ndarray)
+    def k_space_update(self, k_space):
+        self.k_space = k_space
+
+    @QtCore.pyqtSlot()    
+    def output_update(self):
+        ### Make inverse fourier transform
+        result_image = np.fft.ifft2(self.k_space)
+        result_image = np.rot90(result_image, 3)
         
-        Parameters:
-        phantom (Phantom): Phantom object.
-        t (float): Time elapsed since excitation.
+        if self.choose_output_1.isChecked():
+            self.output_viewer_1.drawData(np.abs(result_image), "Output 1")
+        elif self.choose_output_2.isChecked():
+            self.output_viewer_2.drawData(np.abs(result_image), "Output 2")
         
-        Returns:
-        phantom (Phantom): Phantom object.
-        """
-        E1 = np.exp(-t/t1)
-        E2 = np.exp(-t/t2)
-        M0 = 1
+        self.run_button.setIcon(QtGui.QIcon("./assets/play.ico"))
+        self.run_button.setText("Run")
         
-        mat1 = np.array([[E2, 0, 0],
-                         [0, E2, 0],
-                         [0, 0, E1]])
-        mat2 = np.array([0, 0, M0*(1-E1)])
-        magnetization_vector = np.matmul(mat1, magnetization_vector) + mat2
-        
-        return magnetization_vector
-       
+        self.choose_output_1.setEnabled(True)
+        self.choose_output_2.setEnabled(True)
+        self.running = False
+
+    """MRI Functions"""           
     # Close the application
     def closeEvent(self, QCloseEvent):
         super().closeEvent(QCloseEvent)

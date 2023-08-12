@@ -45,7 +45,6 @@ class PhantomViewer(viewer):
                     bbox=dict(boxstyle="round", fc="w"), arrowprops=dict(arrowstyle="->",color="white"))
         self.annot.set_visible(False)
 
-
     ###############################################
     """Image Functions"""
     ###############################################
@@ -65,6 +64,7 @@ class PhantomViewer(viewer):
         self.phantom.setImage(image)
         self.drawData(self.phantom.PD, title="Protein Density")
 
+    # Set Shepp Logan
     def setSheppLogan(self, N:int):       
         image = shepp_logan(N)
 
@@ -76,6 +76,24 @@ class PhantomViewer(viewer):
         self.phantom.setImage(image)
         self.drawData(self.phantom.PD, title="Protein Density")
 
+    # Set constant
+    def setConstant(self, N:int, value:int):       
+        image = np.ones((N, N), dtype=np.uint8)
+        image = image * value
+        
+        if image.ndim > 2:
+            image = image[:,:,0]
+        else:
+            image = image
+
+        self.phantom.setImage(image)
+        self.drawData(self.phantom.PD, title="Protein Density")
+
+    def setArray(self, array):
+        array = np.array(array)
+        self.phantom.setImage(array)
+        self.drawData(self.phantom.PD, title="Protein Density")
+    
     # Generate gradient
     def generate_gradient(self, N, color1=0, color2=255, direction="horizontal"):
         image = np.zeros((N, N), dtype=np.uint8)
@@ -89,6 +107,7 @@ class PhantomViewer(viewer):
         
         return image
 
+    # Set gradient
     def setGradient(self, N:int):       
         image = self.generate_gradient(N)
 
@@ -140,12 +159,14 @@ class PhantomViewer(viewer):
             x = round(event.ydata)
             y = round(event.xdata)
             
+            MText = f"(x,y,z)=({round(self.phantom.M[x][y][0],2)}, {round(self.phantom.M[x][y][1],2)}, {round(self.phantom.M[x][y][2],2)})"
             pdText = f"PD={round(self.phantom.PD[x][y],2)}"
             t1Text = f"T1={round(self.phantom.T1[x][y],2)}"
             t2Text = f"T2={round(self.phantom.T2[x][y],2)}"
             t2sText = f"T2*= {round(self.phantom.T2s[x][y],2)}"
             deltaBText = f"Delta B={round(self.phantom.DeltaB[x][y],2)}"
-            text = f"{pdText}\n{t1Text}\n{t2Text}\n{t2sText}\n{deltaBText}"
+
+            text = f"{MText}\n{pdText}\n{t1Text}\n{t2Text}\n{t2sText}\n{deltaBText}"
             self.annot.set_text(text)
         else:
             self.annot.set_visible(False)

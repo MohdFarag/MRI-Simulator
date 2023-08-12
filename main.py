@@ -2,6 +2,10 @@ import sys
 from PyQt5.QtWidgets import QApplication 
 from app import MainWindow
 from qdarktheme import load_stylesheet
+# Ignore warnings
+import warnings
+warnings.filterwarnings("ignore")
+
 
 def main():
     """Main function for the application."""

@@ -4,6 +4,7 @@
 
 # math & matrix computations library
 import numpy as np
+from utils import scaleImage
 
 # Matplotlib
 import matplotlib.pyplot as plt
@@ -73,13 +74,22 @@ class viewer(FigureCanvasQTAgg):
         self.clearData()
                         
     # Draw image with matplotlib
-    def drawData(self, image, title="Blank", cmap=plt.cm.Greys_r):
+    def drawData(self, image, title="Blank", cmap=plt.cm.Greys_r, origin='upper', a_min=0, a_max=255):
+        # Clear figure
         self.clearData()
-
-        image = self.scaleImage(image)
+         
+        # Scale image
+        image = scaleImage(image, a_min, a_max)
         
+        # Draw image
         self.axes.set_title(title, fontsize = 16)
-        self.axes.imshow(image, cmap=cmap, aspect='equal', origin='upper')
+        self.axes.imshow(image, cmap=cmap, origin=origin)
+        self.draw()
+
+    # Draw image with matplotlib
+    def drawData2(self, image, cmap=plt.cm.Greys_r):
+        # Draw image
+        self.axes.imshow(image, cmap=cmap)
         self.draw()
 
     # Save Image
@@ -95,16 +105,3 @@ class viewer(FigureCanvasQTAgg):
     # Reset figure and variables
     def reset(self):
         self.clearData()
-        
-    # Scale function
-    def scaleImage(self, image:np.ndarray, a_min=0, a_max=255):
-        resultImage = np.zeros(image.shape)
-        
-        image = image - image.min()
-        if image.max() == 0 and image.min() == 0:
-            resultImage = a_max * (image / 1)
-        else:            
-            resultImage = a_max * (image / image.max())
-
-        resultImage = np.round(np.asarray(resultImage, np.int64))
-        return resultImage
