@@ -7,7 +7,7 @@ import numpy as np
 
 # Matplotlib
 import matplotlib.image as mpimg
-from viewer import viewer
+from Viewer import viewer
 
 # Phantom for testing
 from Phantom import Phantom
@@ -60,7 +60,7 @@ class PhantomViewer(viewer):
             image = image[:,:,0]
         else:
             image = image
-
+            
         self.phantom.setImage(image)
         self.drawData(self.phantom.PD, title="Protein Density")
 
@@ -80,15 +80,11 @@ class PhantomViewer(viewer):
     def setConstant(self, N:int, value:int):       
         image = np.ones((N, N), dtype=np.uint8)
         image = image * value
-        
-        if image.ndim > 2:
-            image = image[:,:,0]
-        else:
-            image = image
 
         self.phantom.setImage(image)
         self.drawData(self.phantom.PD, title="Protein Density")
 
+    # Set specific array
     def setArray(self, array):
         array = np.array(array)
         self.phantom.setImage(array)

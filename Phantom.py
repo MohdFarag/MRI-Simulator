@@ -1,6 +1,6 @@
 # Numpy library
 import numpy as np
-from utils import scaleImage
+from utils import scale_image, find_most_frequent_pixels
 
 # Phantom
 class Phantom():
@@ -18,6 +18,7 @@ class Phantom():
         
     # Set Data
     def setImage(self, image:np.ndarray):
+        # Make sure image is grayscale        
         if image.ndim == 2:
             self.width  = image.shape[0]
             self.height = image.shape[1]
@@ -26,7 +27,7 @@ class Phantom():
             self.height = 0
         
         # Scale image
-        image = scaleImage(image)
+        image = scale_image(image)
 
         # Set data
         self.M = np.zeros((self.width, self.height, 3))      # Magnetization vector
@@ -76,33 +77,33 @@ class Phantom():
                 self.M[i][j] = (0, 0, self.PD[i][j])
 
                 if 0 <= self.PD[i][j] < 25:
-                    self.T1[i][j] = 3.5
-                    self.T2[i][j] = 1.4
-                    self.DeltaB[i][j] = 0.05
+                    self.T1[i][j] = 0.35
+                    self.T2[i][j] = 0.29
+                    self.DeltaB[i][j] = 0.325
                     
                 elif 25 <= self.PD[i][j] < 51:
-                    self.T1[i][j] = 1.5
-                    self.T2[i][j] = 1.2
-                    self.DeltaB[i][j] = 0.10
+                    self.T1[i][j] = 0.74
+                    self.T2[i][j] = 0.25
+                    self.DeltaB[i][j] = 0.09
                 
                 elif 51 <= self.PD[i][j] < 76:
-                    self.T1[i][j] = 1.4
-                    self.T2[i][j] = 0.45
-                    self.DeltaB[i][j] = 0.020
+                    self.T1[i][j] = 0.89
+                    self.T2[i][j] = 0.25
+                    self.DeltaB[i][j] = 0.09
                 
                 elif  76 <= self.PD[i][j] < 101:
-                    self.T1[i][j] = 3.2
-                    self.T2[i][j] = 0.8
-                    self.DeltaB[i][j] = 0.3
-                
-                elif 101 <= self.PD[i][j] < 255:
-                    self.T1[i][j] = 0.35
-                    self.T2[i][j] = 0.010
-                    self.DeltaB[i][j] = 0.0005
+                    self.T1[i][j] = 1.0
+                    self.T2[i][j] = 0.32
+                    self.DeltaB[i][j] = 0.192
+                                    
+                elif 101 <= self.PD[i][j] < 200:
+                    self.T1[i][j] = 0.95
+                    self.T2[i][j] = 0.2
+                    self.DeltaB[i][j] = 0.13
 
                 else:
-                    self.T1[i][j] = 0.8
-                    self.T2[i][j] = 0.40
-                    self.DeltaB[i][j] = 0.015
+                    self.T1[i][j] = 1.5
+                    self.T2[i][j] = 0.2
+                    self.DeltaB[i][j] = 0.10
                     
         self.T2s = 1/((1/self.T2) + self.DeltaB)

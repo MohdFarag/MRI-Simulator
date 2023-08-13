@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.image as mpimg
 
-from viewer import viewer
+from Viewer import viewer
 
 # Phantom for testing
 class ImageViewer(viewer):
@@ -79,7 +79,7 @@ class ImageViewer(viewer):
             
             # Set Text
             index = f"{x} , {y}" # Index
-            intensity = self.image[x][y] # Image intensity
+            intensity = np.round(self.image[x][y],2) # Image intensity
             text = f"{index} = {intensity}"
             self.annot.set_text(text)
         else:

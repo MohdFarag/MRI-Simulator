@@ -36,7 +36,6 @@ class SequenceWorker(QObject):
             
         # Get the phantom size
         N = self.phantom.width
-        self.phantom.setRandomData() # Set random data
                 
         # Simulate the sequence
         ## Generate k space
@@ -45,16 +44,16 @@ class SequenceWorker(QObject):
         
         pe_gradient = 0 # Phase encoding gradient        
         pe_flag = fe_flag = False
+        progress_counter = 0
         # Loop over the phase encoding gradient
         while pe_gradient < N and self._isRunning:
             # Reset the frequency encoding gradient
             fe_gradient = 0
-            
             # Loop over the sequence components
             for component in self.sequence:
                 # Get Component Type
                 component_type = component[1]
-                                
+
                 # Check component type 
                 if component_type == RF_PULSE:
                     # If component type is RF
@@ -78,10 +77,13 @@ class SequenceWorker(QObject):
                 elif component_type == GRADIENT:
                     fe_flag = True
 
+                elif component_type == SPOILER:
+                    spoiler_flag = True
+                    
                 elif component_type == READOUT:
                     # If component type is readout
                     while fe_gradient < N and pe_gradient < N:
-                        copied_phantom = self.phantom.copy()
+                        # copied_phantom = self.phantom.copy()
                         for x in range(N):
                             for y in range(N):
                                 # Set the rotation angle
@@ -89,11 +91,17 @@ class SequenceWorker(QObject):
                                 rotation_angle_fe = angles[fe_gradient] * x
                                 
                                 # Apply the rotation
-                                copied_phantom.M[x][y] = self.rotation(copied_phantom.M[x][y], rotation_angle_pe, Z_AXIS)
-                                copied_phantom.M[x][y] = self.rotation(copied_phantom.M[x][y], rotation_angle_fe, Z_AXIS)
+                                self.phantom.M[x][y] = self.rotation(self.phantom.M[x][y], rotation_angle_pe, Z_AXIS)
+                                self.phantom.M[x][y] = self.rotation(self.phantom.M[x][y], rotation_angle_fe, Z_AXIS)
                                 
-                        # Read the signal
-                        self.k_space[pe_gradient][fe_gradient] = np.sum(copied_phantom.getMxy())
+                                # Read the signal
+                                self.k_space[pe_gradient][fe_gradient] += self.phantom.getMxy()[x][y]
+
+                                if spoiler_flag:
+                                    # Apply the rotation
+                                    self.phantom.M[x][y] = self.rotation(self.phantom.M[x][y], -rotation_angle_pe, Z_AXIS)
+                                    self.phantom.M[x][y] = self.rotation(self.phantom.M[x][y], -rotation_angle_fe, Z_AXIS)
+
                         fe_gradient += 1
 
                     # If sequence has phase encoding component
@@ -103,7 +111,10 @@ class SequenceWorker(QObject):
                     # Update the k-space matrix
                     self.k_space_update.emit(self.k_space)
                     self.k_space_viewer.drawData2(np.abs(self.k_space))
-
+                
+            progress_counter += 1
+            self.progress.emit(round((progress_counter/N)*100))
+                
         self.finished.emit()
     
     # Pause the worker thread
@@ -163,3 +174,6 @@ class SequenceWorker(QObject):
         magnetization_vector = np.dot(mat1, magnetization_vector) + mat2
         
         return magnetization_vector
+    
+    def spoiler(self, magnetization_vector):
+        pass

@@ -11,13 +11,14 @@ import mrsd
 import json
 
 # Viewer
-from viewer import viewer
+from Viewer import viewer
 
 RF_PULSE = "RF"
 RELAXATION = "RELAXATION"
 READOUT = "READOUT"
 GRADIENT = "GRADIENT"
 MULTI_GRADIENT = "MULTI_GRADIENT"
+SPOILER = "SPOILER"
 
 # Phantom for testing
 class SequenceViewer(viewer):
@@ -57,6 +58,10 @@ class SequenceViewer(viewer):
     def setData(self, path:str):
         super().setData(path)
         
+        # Initialize the figure
+        self.diagram = mrsd.Diagram(
+            self.axes, ["RF", "$G_{SS}$", "$G_{PE}$", "$G_{FE}$", "Signal"])
+        
         #################### Read Json File ####################
         with open(path, 'r') as file:
             params = json.load(file)
@@ -74,9 +79,7 @@ class SequenceViewer(viewer):
         axis = readout.get('axis')
         if duration:
             adc, echo, readout = self.diagram.readout(
-                "Signal", "$G_{FE}$", duration, ramp=0.2, center=TE,
-                adc_kwargs={"ec": "0.5"})
-            self.diagram.add("$G_{FE}$", readout.adapt(2, -0.5, 0.2, end=readout.begin))
+                "Signal", "$G_{FE}$", duration, ramp=0, center=TE+1/2*duration)
             
         #################### RF ####################
         RFs = params['RF']
@@ -86,12 +89,12 @@ class SequenceViewer(viewer):
         #################### Gradient ####################
         gradients = params['gradient']
         for gradient in gradients:
-            self.add_gradient(self.diagram, gradient)
+            self.add_gradient(self.diagram, gradient, TE, TR)
             
         ################# Multi gradient #################
         multi_gradients = params['multi_gradient']
         for gradient in multi_gradients:
-            self.add_multi_gradient(self.diagram, gradient)
+            self.add_multi_gradient(self.diagram, gradient, TE, TR)
 
         ################# Add Intervals #################
         self.add_intervals(self.diagram, TE, TR)
@@ -113,19 +116,21 @@ class SequenceViewer(viewer):
     def add_RF(self, diagram:mrsd.Diagram, RF, TE=0, TR=0):
         flip_angle = RF.get('flip_angle')
         flip_angle_rad = math.radians(flip_angle)
-        start_time = eval(str(RF.get('time')), {}, {"TE": TE, "TR": TR})
+        time = eval(str(RF.get('time')), {}, {"TE": TE, "TR": TR})
         duration = RF.get('duration')
-        rf_pulse, gradient = diagram.selective_pulse("RF", "$G_{SS}$", duration=duration, pulse_amplitude=flip_angle_rad, center=start_time)
-        diagram.annotate("RF", x=rf_pulse.end, y=2, text=rf"$\alpha$={flip_angle}" )
+        rf_pulse, gradient = diagram.selective_pulse("RF", "$G_{SS}$", duration=duration, pulse_amplitude=flip_angle_rad, center=time)
+        diagram.annotate("RF", x=rf_pulse.end, y=2, text=rf"$\alpha$={flip_angle}")
 
         return rf_pulse, gradient
 
     # Add gradient
-    def add_gradient(self, diagram:mrsd.Diagram, gradient):
-        time = gradient.get('time')
+    def add_gradient(self, diagram:mrsd.Diagram, gradient, TE=0, TR=0):
+        time = eval(str(gradient.get('time')), {}, {"TE": TE, "TR": TR})
         amplitude = gradient.get('amplitude')
         duration = gradient.get('duration')
+        angle = gradient.get('angle')
         axis = gradient.get('axis')
+        
         if (axis == "y"):
             diagram.gradient("$G_{PE}$", duration, amplitude, center=time)
         elif (axis == "x"):
@@ -134,8 +139,8 @@ class SequenceViewer(viewer):
             diagram.gradient("$G_{SS}$", duration, amplitude, center=time)
 
     # Add multi gradient
-    def add_multi_gradient(self, diagram:mrsd.Diagram, gradient):
-        time = gradient.get('time')
+    def add_multi_gradient(self, diagram:mrsd.Diagram, gradient, TE=0, TR=0):
+        time = eval(str(gradient.get('time')), {}, {"TE": TE, "TR": TR})
         axis = gradient.get('axis')
         sign = gradient.get('sign')
         if (axis == "y"):
@@ -145,12 +150,11 @@ class SequenceViewer(viewer):
         elif (axis == "z"):
             gradient_loc = "$G_{SS}$"
         
-        diagram.multi_gradient(gradient_loc, 1.75, 0.75, 0.1, center = time)
+        diagram.multi_gradient(gradient_loc, amplitude=0.65, flat_top=TR/10, center = time)
         if sign == True:
-            diagram.annotate(gradient_loc, time-1.75, 0.5, r"$\uparrow$" )
+            diagram.annotate(gradient_loc, time, 0.85, r"$\uparrow$" )
         else:
-            diagram.annotate(gradient_loc, time-1.75, 0.5, r"$\downarrow$" )
-
+            diagram.annotate(gradient_loc, time, 0.85, r"$\downarrow$" )
 
     # Add RF
     def add_intervals(self, diagram:mrsd.Diagram, TE=0, TR=0):
@@ -165,8 +169,13 @@ class SequenceViewer(viewer):
         RF = sequence['RF']
         gradient = sequence['gradient']
         multi_gradient = sequence['multi_gradient']
+        
+        # Get TE and TR
         TE = sequence['TE']
         TR = sequence['TR']
+        spoiler = sequence['SPOILER']
+        if spoiler:
+            self.timeBasedSequence.append((0, SPOILER))
 
         # RF
         for item in RF:
@@ -174,10 +183,10 @@ class SequenceViewer(viewer):
             duration = item.get('duration')
             flip_angle = item.get("flip_angle")
             self.timeBasedSequence.append((time, RF_PULSE, duration, flip_angle))
-        
+
         # Gradient
         for item in gradient:
-            time = item.get('time')
+            time = eval(str(item.get('time')), {}, {"TE": TE, "TR": TR})
             duration = item.get('duration')
             amplitude = item.get("amplitude")
             axis = item.get('axis')
@@ -185,7 +194,7 @@ class SequenceViewer(viewer):
         
         # Multi Gradient
         for item in multi_gradient:
-            time = item.get('time')
+            time = eval(str(item.get('time')), {}, {"TE": TE, "TR": TR})
             axis = item.get('axis')
             sign = item.get('sign')
             self.timeBasedSequence.append((time, MULTI_GRADIENT, axis, sign))
@@ -199,13 +208,13 @@ class SequenceViewer(viewer):
                 if duration != 0:
                     time = self.timeBasedSequence[i][0]
                     relaxationList.append((time, RELAXATION, duration))
-                    
         self.timeBasedSequence.extend(relaxationList)
-                
+
         def gettime(comp):
             return comp[0]
 
         self.timeBasedSequence.sort(reverse=False, key=gettime)
+        self.timeBasedSequence.append((self.timeBasedSequence[-1][0], RELAXATION, TR-self.timeBasedSequence[-1][0]))
 
     # Get Sequence Based On time
     def getSequenceBasedOnTime(self):

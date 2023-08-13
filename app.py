@@ -28,7 +28,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setWindowTitle("Magnetic Resonance Imaging Simulator")
         self.setWindowIcon(QtGui.QIcon("assets/icon.ico"))
         self.running = False
-                                       
+        self.k_space = np.array([])
+        
         # Initialize the UI
         self.UI_init()
          
@@ -38,8 +39,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Connect signals and slots
         self.connect()
         
-        # Test
-        self.Test_1()
+        # Show the window        
+        self.phantom_viewer.setConstant(3,0)
 
     def UI_init(self):
         # Create a central widget and set the layout
@@ -70,7 +71,19 @@ class MainWindow(QtWidgets.QMainWindow):
         self.phantom_viewer.setCursor(QtGui.QCursor())
         self.phantom_viewer.setFocusPolicy(QtCore.Qt.ClickFocus)
         viewer_layout.addWidget(self.phantom_viewer)
-
+        #### Phantom Buttons Layout
+        self.phantom_buttons_layout = QtWidgets.QHBoxLayout()
+        ##### Shepp Logan Button
+        self.shepp_logan_button = QtWidgets.QPushButton("Shepp Logan")
+        self.phantom_buttons_layout.addWidget(self.shepp_logan_button)
+        ##### Gradient Button
+        self.gradient_button = QtWidgets.QPushButton("Gradient")
+        self.phantom_buttons_layout.addWidget(self.gradient_button)
+        ##### Constant Button
+        self.const_button = QtWidgets.QPushButton("Constant")
+        self.phantom_buttons_layout.addWidget(self.const_button)
+        viewer_layout.addLayout(self.phantom_buttons_layout)
+        
         ###############################
 
         ### Sequence Layout
@@ -113,6 +126,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.k_space_viewer.setCursor(QtGui.QCursor())
         self.k_space_viewer.setFocusPolicy(QtCore.Qt.ClickFocus)
         k_space_layout.addWidget(self.k_space_viewer)
+        #### Progress Bar
+        self.progress_bar = QtWidgets.QProgressBar()
+        self.progress_bar.setRange(0,100)
+        self.progress_bar.setValue(0)
+        k_space_layout.addWidget(self.progress_bar)
 
         ###############################
         
@@ -163,19 +181,17 @@ class MainWindow(QtWidgets.QMainWindow):
         central_layout.addWidget(main_splitter)
         central_widget.setLayout(central_layout)
         self.setCentralWidget(central_widget)
-
-    def Test_1(self):
-        N = 16
-        self.phantom_viewer.setSheppLogan(N)
-        # self.phantom_viewer.setGradient(N)
-        # self.phantom_viewer.setConstant(N,120)
-        # self.phantom_viewer.setArray([[0,1,2],[0,5,1],[4,3,7]])
-        self.load_sequence("./Resources/Sequences/gre_profile.json")
     
     # Connect signals and slots         
     def connect(self):
+        # Mode Selector
         self.mode_selector.currentIndexChanged.connect(self.change_mode)
+        # Run Button
         self.run_button.clicked.connect(self.run_button_event)
+        # Phantom Buttons
+        self.shepp_logan_button.clicked.connect(lambda: self.phantom_viewer.setSheppLogan(32))
+        self.gradient_button.clicked.connect(lambda: self.phantom_viewer.setGradient(32))
+        self.const_button.clicked.connect(lambda: self.phantom_viewer.setConstant(32,120))
 
     # Create the menu bar
     def create_menu(self):
@@ -194,7 +210,7 @@ class MainWindow(QtWidgets.QMainWindow):
         file_menu.addAction(open_phantom_action)
         file_menu.addAction(open_sequence_action)
 
-    # Open data
+    # Open Phantom
     def open_phantom(self):
         file_dialog = QFileDialog()
         file_dialog.setFileMode(QFileDialog.ExistingFile)
@@ -209,6 +225,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 #     print(e)
                 #     QtWidgets.QMessageBox.critical(self, "Error", "Unable to open the phantom file.")
 
+    # Open Sequence
     def open_sequence(self):
         file_dialog = QFileDialog()
         file_dialog.setFileMode(QFileDialog.ExistingFile)
@@ -223,12 +240,11 @@ class MainWindow(QtWidgets.QMainWindow):
                 #     print(e)
                 #     QtWidgets.QMessageBox.critical(self, "Error", "Unable to open the sequence file.")                    
 
-    # Load the data
+    # Load Phantom
     def load_phantom(self, filename):
-        # Set the image
         self.phantom_viewer.setData(filename)
 
-    # Load the data
+    # Load Sequence
     def load_sequence(self, filename):
         self.sequence_viewer.setData(filename)
     
@@ -238,6 +254,12 @@ class MainWindow(QtWidgets.QMainWindow):
     
     # Run Button
     def run_button_event(self):
+        # Get sequence based on time
+        sequence = self.sequence_viewer.getSequenceBasedOnTime() # [(Time, Type, duration, flip_angle, Sign), ...]
+        if sequence == []:
+            QtWidgets.QMessageBox.critical(self, "Error", "Please load a sequence first.")
+            return
+
         if self.running:
             self.run_button.setText("Run")
             self.run_button.setIcon(QtGui.QIcon("./assets/play.ico"))
@@ -245,12 +267,12 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self.run_button.setText("Cancel")
             self.run_button.setIcon(QtGui.QIcon("./assets/cancel.ico"))
-            self.run_sequence()
+            self.run_sequence(sequence)
             
         self.running = not self.running
 
     # Run the sequence
-    def run_sequence(self):
+    def run_sequence(self, sequence):
         # Settings before running
         self.choose_output_1.setEnabled(False)
         self.choose_output_2.setEnabled(False)
@@ -258,11 +280,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Get phantom to simulate
         phantom = self.phantom_viewer.getPhantom() # Phantom object [M, T1, T2, PD]
         N = phantom.width
-        
-        # Get sequence based on time
-        sequence = self.sequence_viewer.getSequenceBasedOnTime() # [(Time, Type, duration, flip_angle, Sign), ...]
-        print(sequence)
-        
+
         # Initialize the thread and worker
         self.thread = QtCore.QThread()
         self.worker = SequenceWorker(phantom, sequence, self.k_space_viewer)
@@ -277,13 +295,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.worker.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
         self.worker.k_space_update.connect(self.k_space_update)
+        self.worker.progress.connect(self.updateSimulatorProgress)
         
         # Start the thread
         self.thread.start()
 
         ## Generate output
         ### Draw the result
-        self.thread.finished.connect(self.output_update)                
+        self.thread.finished.connect(self.output_update)
 
     # Pause the sequence
     def pause_sequence(self):
@@ -291,6 +310,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.choose_output_2.setEnabled(True)
         self.worker.pause()
     
+    # Update the progress bar    
+    def updateSimulatorProgress(self, progress):
+        self.progress_bar.setValue(progress)
+        
     @QtCore.pyqtSlot(np.ndarray)
     def k_space_update(self, k_space):
         self.k_space = k_space
@@ -300,6 +323,7 @@ class MainWindow(QtWidgets.QMainWindow):
         ### Make inverse fourier transform
         result_image = np.fft.ifft2(self.k_space)
         result_image = np.rot90(result_image, 3)
+        result_image = np.fliplr(result_image)
         
         if self.choose_output_1.isChecked():
             self.output_viewer_1.drawData(np.abs(result_image), "Output 1")

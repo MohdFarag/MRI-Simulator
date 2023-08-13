@@ -4,7 +4,7 @@
 
 # math & matrix computations library
 import numpy as np
-from utils import scaleImage
+from utils import scale_image
 
 # Matplotlib
 import matplotlib.pyplot as plt
@@ -79,11 +79,11 @@ class viewer(FigureCanvasQTAgg):
         self.clearData()
          
         # Scale image
-        image = scaleImage(image, a_min, a_max)
+        image = scale_image(image, a_min, a_max)
         
         # Draw image
         self.axes.set_title(title, fontsize = 16)
-        self.axes.imshow(image, cmap=cmap, origin=origin)
+        self.axes.imshow(image, cmap=cmap, origin=origin, vmin=a_min, vmax=a_max)
         self.draw()
 
     # Draw image with matplotlib
