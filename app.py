@@ -62,10 +62,16 @@ class MainWindow(QtWidgets.QMainWindow):
         viewer_layout = QtWidgets.QVBoxLayout()
         viewer_widget = QtWidgets.QWidget()
         viewer_widget.setLayout(viewer_layout)
-        #### Selector
+        #### Selector Layout
+        selector_layout = QtWidgets.QHBoxLayout()
+        ##### Selector
         self.mode_selector = QtWidgets.QComboBox()
         self.mode_selector.addItems(["Protein Density", "T1", "T2", "T2*", "Delta B"])
-        viewer_layout.addWidget(self.mode_selector)
+        selector_layout.addWidget(self.mode_selector,2)
+        ##### Reset Button
+        self.reset_M_Btn = QtWidgets.QPushButton("Reset Magnetization")
+        selector_layout.addWidget(self.reset_M_Btn,1)
+        viewer_layout.addLayout(selector_layout)
         #### Phantom Viewer
         self.phantom_viewer = PhantomViewer(title="Phantom")
         self.phantom_viewer.setCursor(QtGui.QCursor())
@@ -192,6 +198,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.shepp_logan_button.clicked.connect(lambda: self.phantom_viewer.setSheppLogan(32))
         self.gradient_button.clicked.connect(lambda: self.phantom_viewer.setGradient(32))
         self.const_button.clicked.connect(lambda: self.phantom_viewer.setConstant(32,120))
+        # Reset Mag. Button
+        self.reset_M_Btn.clicked.connect(self.phantom_viewer.resetM)
 
     # Create the menu bar
     def create_menu(self):

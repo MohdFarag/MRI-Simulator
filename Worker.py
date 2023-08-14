@@ -43,8 +43,9 @@ class SequenceWorker(QObject):
         angles = np.linspace(-180, 180, N, endpoint=False) # Angles that will be used to generate the phase shifts
         
         pe_gradient = 0 # Phase encoding gradient        
-        pe_flag = fe_flag = False
-        progress_counter = 0
+        pe_flag = False # Flag to check if the sequence has phase encoding component
+        progress_counter = 0 # Progress counter
+        
         # Loop over the phase encoding gradient
         while pe_gradient < N and self._isRunning:
             # Reset the frequency encoding gradient
@@ -71,19 +72,21 @@ class SequenceWorker(QObject):
                             t = component[2]
                             self.phantom.M[x][y] = self.relaxation(self.phantom.M[x][y], t, self.phantom.T1[x][y], self.phantom.T2[x][y], self.phantom.PD[x][y])
                                                         
-                elif component_type == MULTI_GRADIENT:
+                elif component_type == PE_MULTI_GRADIENT:
                     pe_flag = True
 
-                elif component_type == GRADIENT:
-                    fe_flag = True
+                elif component_type == FE_GRADIENT:
+                    pass
 
                 elif component_type == SPOILER:
-                    spoiler_flag = True
-                    
+                    for x in range(N):
+                        for y in range(N):
+                            self.phantom.M[x][y] = self.spoiler(self.phantom.M[x][y])
+                                    
                 elif component_type == READOUT:
                     # If component type is readout
                     while fe_gradient < N and pe_gradient < N:
-                        # copied_phantom = self.phantom.copy()
+                        copied_phantom = self.phantom.copy()
                         for x in range(N):
                             for y in range(N):
                                 # Set the rotation angle
@@ -91,16 +94,11 @@ class SequenceWorker(QObject):
                                 rotation_angle_fe = angles[fe_gradient] * x
                                 
                                 # Apply the rotation
-                                self.phantom.M[x][y] = self.rotation(self.phantom.M[x][y], rotation_angle_pe, Z_AXIS)
-                                self.phantom.M[x][y] = self.rotation(self.phantom.M[x][y], rotation_angle_fe, Z_AXIS)
+                                copied_phantom.M[x][y] = self.rotation(copied_phantom.M[x][y], rotation_angle_pe, Z_AXIS)
+                                copied_phantom.M[x][y] = self.rotation(copied_phantom.M[x][y], rotation_angle_fe, Z_AXIS)
                                 
                                 # Read the signal
-                                self.k_space[pe_gradient][fe_gradient] += self.phantom.getMxy()[x][y]
-
-                                if spoiler_flag:
-                                    # Apply the rotation
-                                    self.phantom.M[x][y] = self.rotation(self.phantom.M[x][y], -rotation_angle_pe, Z_AXIS)
-                                    self.phantom.M[x][y] = self.rotation(self.phantom.M[x][y], -rotation_angle_fe, Z_AXIS)
+                                self.k_space[pe_gradient][fe_gradient] += copied_phantom.getMxy()[x][y]
 
                         fe_gradient += 1
 
@@ -175,5 +173,8 @@ class SequenceWorker(QObject):
         
         return magnetization_vector
     
+    # Apply a spoiler gradient
     def spoiler(self, magnetization_vector):
-        pass
+        magnetization_vector[0] = 0
+        magnetization_vector[1] = 0
+        return magnetization_vector

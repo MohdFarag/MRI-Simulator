@@ -19,13 +19,17 @@
 
 #### Features
 
--
--
+- User can open phantom with random T1, T2, T2*
+- User can open a sequence from .json file.
+- User can simulate the sequence on the phantom and fill the k space.
+- User can compare between outputs that reconstructed from different sequences.
 
 #### Technologies
 
 - Python
--
+- Numpy
+- Matplotlib
+- mrsd
 
 [Back To The Top](#mri-simulator)
 
@@ -64,7 +68,6 @@ $ python3 main.py
 ## References
 
 - [PyQt5](https://pypi.org/project/PyQt5/)
-
 
 [Back To The Top](#mri-simulator)
 

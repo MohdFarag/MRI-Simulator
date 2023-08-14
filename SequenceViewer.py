@@ -13,12 +13,16 @@ import json
 # Viewer
 from Viewer import viewer
 
+# Constants
 RF_PULSE = "RF"
 RELAXATION = "RELAXATION"
 READOUT = "READOUT"
-GRADIENT = "GRADIENT"
-MULTI_GRADIENT = "MULTI_GRADIENT"
 SPOILER = "SPOILER"
+PE_MULTI_GRADIENT = "PE_MULTI_GRADIENT"
+PE_GRADIENT = "PE_GRADIENT"
+FE_GRADIENT = "FE_GRADIENT"
+
+RF_TITLE, GSS_TITLE, GPE_TITLE, GFE_TITLE, SIGNAL_TITLE = "RF", "$G_{SS}$", "$G_{PE}$", "$G_{FE}$", "Signal"
 
 # Phantom for testing
 class SequenceViewer(viewer):
@@ -32,10 +36,20 @@ class SequenceViewer(viewer):
         
         # Variables
         self.timeBasedSequence = list()
+        ## Information
+        self.name = ""
+        self.abbreviation = ""
+        ## Intervals
+        self.TR = 0
+        self.TE = 0
+        ## Axis of gradients
+        self.ssAxis = "z"
+        self.peAxis = "y"
+        self.feAxis = "x"
         
         # Initialize the figure
         self.diagram = mrsd.Diagram(
-            self.axes, ["RF", "$G_{SS}$", "$G_{PE}$", "$G_{FE}$", "Signal"])
+            self.axes, [RF_TITLE, GSS_TITLE, GPE_TITLE, GFE_TITLE, SIGNAL_TITLE])
                 
     # Set Theme
     def setTheme(self):
@@ -57,164 +71,203 @@ class SequenceViewer(viewer):
     # Set Data
     def setData(self, path:str):
         super().setData(path)
-        
-        # Initialize the figure
-        self.diagram = mrsd.Diagram(
-            self.axes, ["RF", "$G_{SS}$", "$G_{PE}$", "$G_{FE}$", "Signal"])
-        
+                
         #################### Read Json File ####################
         with open(path, 'r') as file:
             params = json.load(file)
-            self.setSequenceBasedOnTime(params) # Set Sequence List Based On time
 
         #################### Update the parameters with JSON data ####################
-        TE = params.get('TE')
-        TR = params.get('TR')
+        self.name = params.get('name')
+        self.abbreviation = params.get('abbreviation')
+        self.axes.set_title(f"{self.name} ({self.abbreviation})")
         
-        #################### readout/Signal ####################
-        readout = params['readout']
-        
-        # readout parameters
-        duration = readout.get('duration')
-        axis = readout.get('axis')
-        if duration:
-            adc, echo, readout = self.diagram.readout(
-                "Signal", "$G_{FE}$", duration, ramp=0, center=TE+1/2*duration)
-            
-        #################### RF ####################
-        RFs = params['RF']
-        for RF in RFs:
-            rf_pulse, gradient = self.add_RF(self.diagram, RF, TE, TR)
-        
-        #################### Gradient ####################
-        gradients = params['gradient']
-        for gradient in gradients:
-            self.add_gradient(self.diagram, gradient, TE, TR)
-            
-        ################# Multi gradient #################
-        multi_gradients = params['multi_gradient']
-        for gradient in multi_gradients:
-            self.add_multi_gradient(self.diagram, gradient, TE, TR)
+        # Gradients Axis
+        self.ssAxis = params.get('ssAxis')
+        self.peAxis = params.get('peAxis')
+        self.feAxis = params.get('feAxis')
+
+        # Intervals
+        self.TR = params.get('TR')
+        self.TE = params.get('TE')
 
         ################# Add Intervals #################
-        self.add_intervals(self.diagram, TE, TR)
+        self.add_intervals()
+        
+        ################# Add Components #################
+        components = params.get('component')
+        
+        ######## RF ########
+        RFs = components['RF']
+        for RF in RFs:
+            rf_pulse, gradient = self.add_RF(RF)
+        
+        ######## PE ########
+        PEs = components.get('PE')
+        # Multi PEs
+        multi_PEs = PEs.get('multi')
+        for multi_PE in multi_PEs:
+            self.add_multi_gradient(multi_PE, GPE_TITLE)
+        # Single PEs
+        single_PEs = PEs.get('single')
+        for single_PE in single_PEs:
+            self.add_gradient(single_PE, GPE_TITLE)
 
+        #################### FE ####################
+        # Single PEs
+        FEs = components.get('FE')
+        for FE in FEs:
+            self.add_gradient(FE, GFE_TITLE)
+
+        #################### Spoiler ####################
+        spoilers = components.get('spoiler')
+        for spoiler in spoilers:
+            self.add_spoiler(spoiler, GPE_TITLE)
+            
+        #################### readout/Signal ####################
+        readout = components.get('readout')
+        # Readout Parameters
+        trajectory = readout.get('trajectory')
+        if trajectory == "Cartesian":
+            # TODO: Draw Cartesian
+            pass
+        elif trajectory == "Radial":
+            # TODO: Draw Radial
+            pass
+        elif trajectory == "Spiral":
+            # TODO: Draw Spiral
+            pass
+        
+        signals = readout.get('signals')
+        for signal in signals:
+            self.add_RO(signal)
+
+        self.orderSequenceBasedOnTime()
         self.draw()
-    
+     
     # Clear figure
     def clearData(self):
         super().clearData()
         self.timeBasedSequence = list()
         self.diagram = mrsd.Diagram(
-            self.axes, ["RF", "$G_{SS}$", "$G_{PE}$", "$G_{FE}$", "Signal"])
+            self.axes, [RF_TITLE, GSS_TITLE, GPE_TITLE, GFE_TITLE, SIGNAL_TITLE])
 
     ###############################################
     """Sequence Functions"""
     ###############################################
 
     # Add RF
-    def add_RF(self, diagram:mrsd.Diagram, RF, TE=0, TR=0):
-        flip_angle = RF.get('flip_angle')
-        flip_angle_rad = math.radians(flip_angle)
-        time = eval(str(RF.get('time')), {}, {"TE": TE, "TR": TR})
+    def add_RF(self, RF):
+        # Get flip angle
+        flip_angle = RF.get('flipAngle')
+        flip_angle_rad = np.round(math.radians(flip_angle),2)
+        
+        # Get time and duration
+        time = self.read_time(RF)
         duration = RF.get('duration')
-        rf_pulse, gradient = diagram.selective_pulse("RF", "$G_{SS}$", duration=duration, pulse_amplitude=flip_angle_rad, center=time)
-        diagram.annotate("RF", x=rf_pulse.end, y=2, text=rf"$\alpha$={flip_angle}")
+        
+        # Add RF
+        rf_pulse, gradient = self.diagram.selective_pulse(RF_TITLE, GSS_TITLE, duration=duration, pulse_amplitude=flip_angle_rad, center=time, gradient_amplitude=0.5)
+        self.diagram.annotate(RF_TITLE, x=rf_pulse.end, y=1, text=rf"$\alpha$={flip_angle}")
+
+        # Add to time based sequence
+        RF_dict = (time, RF_PULSE, duration, flip_angle)
+        self.timeBasedSequence.append(RF_dict)
 
         return rf_pulse, gradient
 
     # Add gradient
-    def add_gradient(self, diagram:mrsd.Diagram, gradient, TE=0, TR=0):
-        time = eval(str(gradient.get('time')), {}, {"TE": TE, "TR": TR})
-        amplitude = gradient.get('amplitude')
-        duration = gradient.get('duration')
+    def add_gradient(self, gradient, loc):
+        time = self.read_time(gradient)
+        step = gradient.get('step')
         angle = gradient.get('angle')
-        axis = gradient.get('axis')
+        duration = gradient.get('duration')
         
-        if (axis == "y"):
-            diagram.gradient("$G_{PE}$", duration, amplitude, center=time)
-        elif (axis == "x"):
-            diagram.gradient("$G_{FE}$", duration, amplitude, center=time)
-        elif (axis == "z"):
-            diagram.gradient("$G_{SS}$", duration, amplitude, center=time)
+        self.diagram.gradient(loc, duration=duration, center=time)
+
+        # Add to time based sequence
+        if loc == GPE_TITLE:
+            gradient_dict = (time, PE_GRADIENT, duration, angle, step)
+        elif loc == GFE_TITLE:
+            gradient_dict = (time, FE_GRADIENT, duration, angle, step)
+
+        self.timeBasedSequence.append(gradient_dict)
 
     # Add multi gradient
-    def add_multi_gradient(self, diagram:mrsd.Diagram, gradient, TE=0, TR=0):
-        time = eval(str(gradient.get('time')), {}, {"TE": TE, "TR": TR})
-        axis = gradient.get('axis')
+    def add_multi_gradient(self, gradient, loc):
+        time = self.read_time(gradient)
+        duration = gradient.get('duration')
+        step = gradient.get('step')
         sign = gradient.get('sign')
-        if (axis == "y"):
-            gradient_loc = "$G_{PE}$"
-        elif (axis == "x"):
-            gradient_loc = "$G_{FE}$"
-        elif (axis == "z"):
-            gradient_loc = "$G_{SS}$"
         
-        diagram.multi_gradient(gradient_loc, amplitude=0.65, flat_top=TR/10, center = time)
+        # Draw multi gradient and annotate        
+        self.diagram.multi_gradient(loc, amplitude=0.65, flat_top=self.TR/10, center = time)
         if sign == True:
-            diagram.annotate(gradient_loc, time, 0.85, r"$\uparrow$" )
+            self.diagram.annotate(loc, time, 0.9, r"$\uparrow$" )
         else:
-            diagram.annotate(gradient_loc, time, 0.85, r"$\downarrow$" )
+            self.diagram.annotate(loc, time, 0.9, r"$\downarrow$" )
 
-    # Add RF
-    def add_intervals(self, diagram:mrsd.Diagram, TE=0, TR=0):
-        if TE != 0 :
-            diagram.interval(0, TE, -1.0, "TE")
-        if TR != 0 :
-            diagram.interval(0, TR, -2.0, "TR")
+        # Add to time based sequence
+        pe_multi_dict = (time, PE_MULTI_GRADIENT, duration, step, sign)
+        self.timeBasedSequence.append(pe_multi_dict)
+
+    # Add readout
+    def add_RO(self, signal):
+        time = self.read_time(signal)
+        duration = signal.get('duration')
+        adc, echo, readout = self.diagram.readout(SIGNAL_TITLE, GFE_TITLE, duration, ramp=0, center=self.TE+1/2*duration, gradient_amplitude=0.5)
+        
+        # Add to time based sequence
+        readout_dict = (time, READOUT, duration)
+        self.timeBasedSequence.append(readout_dict)
+
+    # Add intervals
+    def add_intervals(self):
+        if self.TE != 0 :
+            self.diagram.interval(0, self.TE, -0.5, "TE")
+        if self.TR != 0 :
+            self.diagram.interval(0, self.TR, -1.0, "TR")
+    
+    # Add Spoiler
+    def add_spoiler(self, spoiler, loc):
+        time = self.read_time(spoiler)
+        duration = spoiler.get('duration')
+        
+        # Draw spoiler         
+        self.diagram.gaussian_pulse(loc, amplitude=1, duration=duration, center=time)
+ 
+        # Add to time based sequence
+        spoiler_dict = (time, SPOILER, duration)
+        self.timeBasedSequence.append(spoiler_dict)
+       
+    # Read time
+    def read_time(self, item):
+        time = str(item.get('time'))
+        time = eval(time,
+                    {}, 
+                    {"TE": self.TE, "TR": self.TR})
+        
+        return time
     
     # Set Sequence Based On time
-    def setSequenceBasedOnTime(self, sequence):
-        # Get parameters
-        RF = sequence['RF']
-        gradient = sequence['gradient']
-        multi_gradient = sequence['multi_gradient']
+    def orderSequenceBasedOnTime(self):
+        def get_time(comp):
+            return comp[0]
+
+        # Sort the sequence based on time
+        self.timeBasedSequence.sort(reverse=False, key=get_time)
         
-        # Get TE and TR
-        TE = sequence['TE']
-        TR = sequence['TR']
-        spoiler = sequence['SPOILER']
-        if spoiler:
-            self.timeBasedSequence.append((0, SPOILER))
-
-        # RF
-        for item in RF:
-            time = eval(str(item.get('time')), {}, {"TE": TE, "TR": TR})
-            duration = item.get('duration')
-            flip_angle = item.get("flip_angle")
-            self.timeBasedSequence.append((time, RF_PULSE, duration, flip_angle))
-
-        # Gradient
-        for item in gradient:
-            time = eval(str(item.get('time')), {}, {"TE": TE, "TR": TR})
-            duration = item.get('duration')
-            amplitude = item.get("amplitude")
-            axis = item.get('axis')
-            self.timeBasedSequence.append((time, GRADIENT, duration, amplitude, axis))
-        
-        # Multi Gradient
-        for item in multi_gradient:
-            time = eval(str(item.get('time')), {}, {"TE": TE, "TR": TR})
-            axis = item.get('axis')
-            sign = item.get('sign')
-            self.timeBasedSequence.append((time, MULTI_GRADIENT, axis, sign))
-
-        self.timeBasedSequence.append((TE, READOUT))
-
+        # Add relaxation
         relaxationList = []
         for i, item in enumerate(self.timeBasedSequence):
             if i < len(self.timeBasedSequence)-1:
-                duration = self.timeBasedSequence[i+1][0] - self.timeBasedSequence[i][0]
-                if duration != 0:
+                duration = self.timeBasedSequence[i+1][0] - (self.timeBasedSequence[i][0] + self.timeBasedSequence[i][2])
+                if duration > 0:
                     time = self.timeBasedSequence[i][0]
                     relaxationList.append((time, RELAXATION, duration))
         self.timeBasedSequence.extend(relaxationList)
 
-        def gettime(comp):
-            return comp[0]
-
-        self.timeBasedSequence.sort(reverse=False, key=gettime)
-        self.timeBasedSequence.append((self.timeBasedSequence[-1][0], RELAXATION, TR-self.timeBasedSequence[-1][0]))
+        self.timeBasedSequence.sort(reverse=False, key=get_time)
+        self.timeBasedSequence.append((self.timeBasedSequence[-1][0], RELAXATION, self.TR-self.timeBasedSequence[-1][0]))
 
     # Get Sequence Based On time
     def getSequenceBasedOnTime(self):

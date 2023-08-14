@@ -137,6 +137,10 @@ class PhantomViewer(viewer):
         super().reset()
         self.phantom = Phantom()
 
+    # Reset magnetization vector
+    def resetM(self):
+        self.phantom.resetM()
+        
     ###############################################
     """plt Functions"""
     ###############################################

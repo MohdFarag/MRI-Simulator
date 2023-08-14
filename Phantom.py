@@ -70,6 +70,12 @@ class Phantom():
         copy_phantom.DeltaB = np.copy(self.DeltaB)
         return copy_phantom
     
+    # Reset Magnetization Vector
+    def resetM(self):
+        for i in range(self.width):
+            for j in range(self.height):
+                self.M[i][j] = (0, 0, self.PD[i][j])
+                
     # Set Random Data                      
     def setRandomData(self):
         for i in range(self.width):
