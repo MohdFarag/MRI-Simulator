@@ -12,13 +12,13 @@ class Phantom():
         self.M = np.array([[(0,0,0),(0,0,0)],[(0,0,0),(0,0,0)]])     # Magnetization vector
         self.T1 = np.array([[0,0],[0,0]])                            # T1
         self.T2 = np.array([[0,0],[0,0]])                            # T2
-        self.T2s = np.array([[0,0],[0,0]])                            # T2
+        self.T2s = np.array([[0,0],[0,0]])                           # T2 star
         self.PD = np.array([[0,0],[0,0]])                            # Protein Density
         self.DeltaB = np.array([[0,0],[0,0]])                        # Delta B
         
     # Set Data
     def setImage(self, image:np.ndarray):
-        # Make sure image is grayscale        
+        # Make sure image is grayscale
         if image.ndim == 2:
             self.width  = image.shape[0]
             self.height = image.shape[1]
@@ -83,33 +83,33 @@ class Phantom():
                 self.M[i][j] = (0, 0, self.PD[i][j])
 
                 if 0 <= self.PD[i][j] < 25:
-                    self.T1[i][j] = 0.35
-                    self.T2[i][j] = 0.29
-                    self.DeltaB[i][j] = 0.325
+                    self.T1[i][j] = 240
+                    self.T2[i][j] = 85
+                    self.DeltaB[i][j] = 10
                     
                 elif 25 <= self.PD[i][j] < 51:
-                    self.T1[i][j] = 0.74
-                    self.T2[i][j] = 0.25
-                    self.DeltaB[i][j] = 0.09
+                    self.T1[i][j] = 420
+                    self.T2[i][j] = 45
+                    self.DeltaB[i][j] = 5
                 
                 elif 51 <= self.PD[i][j] < 76:
-                    self.T1[i][j] = 0.89
-                    self.T2[i][j] = 0.25
-                    self.DeltaB[i][j] = 0.09
+                    self.T1[i][j] = 680
+                    self.T2[i][j] = 90
+                    self.DeltaB[i][j] = 12
                 
                 elif  76 <= self.PD[i][j] < 101:
-                    self.T1[i][j] = 1.0
-                    self.T2[i][j] = 0.32
-                    self.DeltaB[i][j] = 0.192
+                    self.T1[i][j] = 810
+                    self.T2[i][j] = 100
+                    self.DeltaB[i][j] = 0.03
                                     
                 elif 101 <= self.PD[i][j] < 200:
-                    self.T1[i][j] = 0.95
-                    self.T2[i][j] = 0.2
-                    self.DeltaB[i][j] = 0.13
+                    self.T1[i][j] = 3000
+                    self.T2[i][j] = 3000
+                    self.DeltaB[i][j] = 195
 
                 else:
-                    self.T1[i][j] = 1.5
-                    self.T2[i][j] = 0.2
-                    self.DeltaB[i][j] = 0.10
+                    self.T1[i][j] = 1500
+                    self.T2[i][j] = 100
+                    self.DeltaB[i][j] = 35
                     
-        self.T2s = 1/((1/self.T2) + self.DeltaB)
+        self.T2s = 1/((1/self.T2) + (1/self.DeltaB))

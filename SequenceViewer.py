@@ -166,8 +166,13 @@ class SequenceViewer(viewer):
         duration = RF.get('duration')
         
         # Add RF
-        rf_pulse, gradient = self.diagram.selective_pulse(RF_TITLE, GSS_TITLE, duration=duration, pulse_amplitude=flip_angle_rad, center=time, gradient_amplitude=0.5)
-        self.diagram.annotate(RF_TITLE, x=rf_pulse.end, y=1, text=rf"$\alpha$={flip_angle}")
+        rf_pulse, gradient = self.diagram.selective_pulse(RF_TITLE, 
+                                                          GSS_TITLE, 
+                                                          duration=duration, 
+                                                          pulse_amplitude=flip_angle_rad, 
+                                                          center=time, 
+                                                          gradient_amplitude=flip_angle_rad/2)
+        self.diagram.annotate(RF_TITLE, x=rf_pulse.end, y=0.2, text=rf"$\alpha$={flip_angle}")
 
         # Add to time based sequence
         RF_dict = (time, RF_PULSE, duration, flip_angle)
@@ -179,16 +184,16 @@ class SequenceViewer(viewer):
     def add_gradient(self, gradient, loc):
         time = self.read_time(gradient)
         step = gradient.get('step')
-        angle = gradient.get('angle')
+        sign = gradient.get('sign')
         duration = gradient.get('duration')
         
-        self.diagram.gradient(loc, duration=duration, center=time)
+        self.diagram.gradient(loc, duration, step/2, duration, center=time)
 
         # Add to time based sequence
         if loc == GPE_TITLE:
-            gradient_dict = (time, PE_GRADIENT, duration, angle, step)
+            gradient_dict = (time, PE_GRADIENT, duration, step, sign)
         elif loc == GFE_TITLE:
-            gradient_dict = (time, FE_GRADIENT, duration, angle, step)
+            gradient_dict = (time, FE_GRADIENT, duration, step, sign)
 
         self.timeBasedSequence.append(gradient_dict)
 
@@ -217,7 +222,7 @@ class SequenceViewer(viewer):
         adc, echo, readout = self.diagram.readout(SIGNAL_TITLE, GFE_TITLE, duration, ramp=0, center=self.TE+1/2*duration, gradient_amplitude=0.5)
         
         # Add to time based sequence
-        readout_dict = (time, READOUT, duration)
+        readout_dict = (time, READOUT, 0)
         self.timeBasedSequence.append(readout_dict)
 
     # Add intervals
@@ -236,7 +241,7 @@ class SequenceViewer(viewer):
         self.diagram.gaussian_pulse(loc, amplitude=1, duration=duration, center=time)
  
         # Add to time based sequence
-        spoiler_dict = (time, SPOILER, duration)
+        spoiler_dict = (time, SPOILER, 0)
         self.timeBasedSequence.append(spoiler_dict)
        
     # Read time
@@ -267,7 +272,11 @@ class SequenceViewer(viewer):
         self.timeBasedSequence.extend(relaxationList)
 
         self.timeBasedSequence.sort(reverse=False, key=get_time)
-        self.timeBasedSequence.append((self.timeBasedSequence[-1][0], RELAXATION, self.TR-self.timeBasedSequence[-1][0]))
+        
+        # Add relaxation at the end
+        duration = self.TR-self.timeBasedSequence[-1][0]
+        if duration > 0:
+            self.timeBasedSequence.append((self.timeBasedSequence[-1][0], RELAXATION, duration))
 
     # Get Sequence Based On time
     def getSequenceBasedOnTime(self):

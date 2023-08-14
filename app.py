@@ -267,6 +267,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if sequence == []:
             QtWidgets.QMessageBox.critical(self, "Error", "Please load a sequence first.")
             return
+        else:
+            print(sequence)
 
         if self.running:
             self.run_button.setText("Run")
