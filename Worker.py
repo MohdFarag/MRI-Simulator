@@ -22,7 +22,7 @@ class SequenceWorker(QObject):
     k_space_update = pyqtSignal(np.ndarray)
     
     # Initialize the worker thread
-    def __init__(self, phantom:Phantom, sequence:list, k_space_viewer:ImageViewer):
+    def __init__(self, phantom:Phantom, sequence:MRISequence, k_space_viewer:ImageViewer):
         super().__init__()
         self._isRunning = True
         self.phantom = phantom
@@ -33,7 +33,10 @@ class SequenceWorker(QObject):
     def run(self):
         if not self._isRunning :
             self._isRunning = True
-            
+        
+        # Get components
+        components = self.sequence.get_components()
+        
         # Get the phantom size
         N = self.phantom.width
                 
@@ -43,106 +46,67 @@ class SequenceWorker(QObject):
         self.k_space = np.zeros((N, N), dtype=complex) # Initialize an NxN complex array with zeros        
         angles = np.linspace(-180, 180, N, endpoint=False) # Angles that will be used to generate the phase shifts
         
-        progress_counter = 0 # Progress counter
-        pe_gradient = 0      # Phase encoding gradient
+        progress_counter = 0
+        pe_gradient = 0 # Phase encoding gradient
+        
         # Loop over the phase encoding gradient
         while pe_gradient < N and self._isRunning:
+            print("Phase encoding gradient: ", pe_gradient)
             # Reset the frequency encoding gradient
             fe_gradient = 0
             # Loop over the sequence components
-            for component in self.sequence:
-                # Get Component Type
-                component_type = component[1]
-
+            for component in components:
                 # Check component type 
-                if component_type == RF_PULSE:
+                if type(component) == RFComponent:
                     # If component type is RF
-                    for x in range(N):
-                        for y in range(N):
-                            # Get Flip Angle
-                            flip_angle = component[3]
-                            # Apply RF pulse by specific flip angle
-                            self.phantom.M[x][y] = self.rotation(self.phantom.M[x][y], flip_angle, X_AXIS)
+                    flip_angle = component.angle
+                    # Apply the RF pulse
+                    self.apply_on_phantom(self.rotation, flip_angle, X_AXIS)
+                    print(self.phantom.M)
                 
-                elif component_type == RELAXATION:
+                elif type(component) == RelaxationComponent:
                     # If Component Type is relaxation
-                    for x in range(N):
-                        for y in range(N):
-                            duration = component[2]
-                            self.phantom.M[x][y] = self.relaxation(self.phantom.M[x][y], duration, self.phantom.T1[x][y], self.phantom.T2[x][y], self.phantom.PD[x][y])
-                                                        
-                elif component_type == PE_MULTI_GRADIENT:
+                    duration = component.duration
+                    self.relaxation_phantom(duration)      
+                                                                      
+                elif type(component) == MultiGradientComponent:
                     # If component type is multi gradient
-                    step = component[3]
-                    sign = component[4]
-                    if sign: factor = 1
-                    else: factor = -1
-                        
-                    for x in range(N):
-                        for y in range(N):
-                            # Set the rotation angle
-                            rotation_angle_pe = factor * angles[pe_gradient] * y                            
-                            # Apply the rotation
-                            self.phantom.M[x][y] = self.rotation(self.phantom.M[x][y], rotation_angle_pe, Z_AXIS)
-                    
-                    if sign: 
-                        pe_gradient += step
-
-                elif component_type == PE_GRADIENT:
-                    step = component[3]
-                    sign = component[4]
-                    
-                    if sign: factor = 1
-                    else: factor = -1
-
+                    sign = component.sign
+                    balanced = component.balanced
                     # Apply the phase encoding gradient
-                    for x in range(N):
-                        for y in range(N):
-                            # Set the rotation angle
-                            rotation_angle_pe = angles[pe_gradient] * y
-                            # Apply the rotation
-                            self.phantom.M[x][y] = self.rotation(self.phantom.M[x][y], rotation_angle_pe, Z_AXIS)
-
-                    pe_gradient += step
-
-                elif component_type == FE_GRADIENT:
-                    step = component[3]
-                    sign = component[4]
+                    # self.apply_phase_encoding(angles, pe_gradient, sign)
+                    # Increment the phase encoding gradient
                     
-                    if sign: factor = 1
-                    else: factor = -1
-                    
-                    # Apply the frequency encoding gradient
-                    for x in range(N):
-                        for y in range(N):
-                            # Set the rotation angle
-                            rotation_angle_fe = factor * angles[fe_gradient] * x
-                            # Apply the rotation
-                            copied_phantom.M[x][y] = self.rotation(copied_phantom.M[x][y], rotation_angle_fe, Z_AXIS)
-
-                    fe_gradient += step
+                elif type(component) == GradientComponent:
+                    # If component type is gradient
+                    encoding = component.encoding
+                    sign = component.sign
+                    balanced = component.balanced
+                    if encoding == "phase":
+                        # Apply the phase encoding gradient
+                        self.apply_phase_encoding(angles, pe_gradient, sign)
+                        # pe_gradient += 1
+                        
+                    else:
+                        # Apply the frequency encoding gradient
+                        pass
        
-                elif component_type == SPOILER:
-                    for x in range(N):
-                        for y in range(N):
-                            self.phantom.M[x][y] = self.spoiler(self.phantom.M[x][y])
+                elif type(component) == SpoilerComponent:
+                    # If component type is spoiler
+                    self.apply_on_phantom(self.spoiler)
                                     
-                elif component_type == READOUT:
+                elif type(component) == ReadoutComponent:
                     # If component type is readout
                     while fe_gradient < N and pe_gradient < N:
-                        # Copy the phantom
-                        copied_phantom = self.phantom.copy()
-                        for x in range(N):
-                            for y in range(N):
-                                # Set the rotation angle
-                                rotation_angle_fe = angles[fe_gradient] * x
-                                # Apply the rotation
-                                copied_phantom.M[x][y] = self.rotation(copied_phantom.M[x][y], rotation_angle_fe, Z_AXIS)
-                                # Read the signal
-                                self.k_space[pe_gradient][fe_gradient] += copied_phantom.getMxy()[x][y]
-                                
+                        # Apply frequency encoding
+                        self.apply_frequency_encoding(angles, fe_gradient, pe_gradient)
+                        
+                        # Increment the frequency encoding gradient
                         fe_gradient += 1
                         
+                    # Increment the phase encoding gradient
+                    pe_gradient += 1
+    
                     # Update the k-space matrix
                     self.k_space_update.emit(self.k_space)
                     self.k_space_viewer.drawData2(np.abs(self.k_space))
@@ -210,8 +174,48 @@ class SequenceWorker(QObject):
         
         return magnetization_vector
     
+    # Simulate T1 and T2 relaxation on phantom
+    def relaxation_phantom(self, t:float):
+        N = self.phantom.width
+        for x in range(N):
+            for y in range(N):
+                self.phantom.M[x][y] = self.relaxation(self.phantom.M[x][y], t, self.phantom.T1[x][y], self.phantom.T2[x][y], self.phantom.PD[x][y])
+   
     # Apply a spoiler gradient
     def spoiler(self, magnetization_vector):
         magnetization_vector[0] = 0
         magnetization_vector[1] = 0
         return magnetization_vector
+    
+    # Apply on phantom
+    def apply_on_phantom(self, func, *args):
+        for x in range(self.phantom.width):
+            for y in range(self.phantom.width):
+                self.phantom.M[x][y] = np.round(func(self.phantom.M[x][y], *args), 2)
+    
+    # Apply a phase encoding gradient
+    def apply_phase_encoding(self, angles, pe_gradient, sign=1):
+        N = self.phantom.width
+        for x in range(N):
+            for y in range(N):
+                # Set the rotation angle
+                rotation_angle_pe = sign * angles[pe_gradient] * y                            
+                # Apply the rotation
+                self.phantom.M[x][y] = self.rotation(self.phantom.M[x][y], rotation_angle_pe, Z_AXIS)
+    
+    # Apply a frequency encoding gradient
+    def apply_frequency_encoding(self, angles, fe_gradient, pe_gradient):
+        copied_phantom = self.phantom.copy()
+        N = self.phantom.width
+        for x in range(N):
+            for y in range(N):
+                # Set the rotation angle
+                rotation_angle_pe = angles[pe_gradient] * y
+                rotation_angle_fe = angles[fe_gradient] * x
+
+                # Apply the rotation
+                copied_phantom.M[x][y] = self.rotation(copied_phantom.M[x][y], rotation_angle_pe, Z_AXIS)
+                copied_phantom.M[x][y] = self.rotation(copied_phantom.M[x][y], rotation_angle_fe, Z_AXIS)
+                
+                # Read the signal
+                self.k_space[pe_gradient][fe_gradient] += copied_phantom.getMxy()[x][y]

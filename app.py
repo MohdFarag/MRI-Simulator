@@ -41,7 +41,9 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # Show the window        
         self.phantom_viewer.setConstant(3,0)
+        self.test()
 
+    # Initialize the UI
     def UI_init(self):
         # Create a central widget and set the layout
         central_widget = QtWidgets.QWidget()
@@ -187,7 +189,7 @@ class MainWindow(QtWidgets.QMainWindow):
         central_layout.addWidget(main_splitter)
         central_widget.setLayout(central_layout)
         self.setCentralWidget(central_widget)
-    
+ 
     # Connect signals and slots         
     def connect(self):
         # Mode Selector
@@ -263,7 +265,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # Run Button
     def run_button_event(self):
         # Get sequence based on time
-        sequence = self.sequence_viewer.getSequenceBasedOnTime() # [(Time, Type, duration, flip_angle, Sign), ...]
+        sequence = self.sequence_viewer.get_sequence() # [(Time, Type, duration, flip_angle, Sign), ...]
         if sequence == []:
             QtWidgets.QMessageBox.critical(self, "Error", "Please load a sequence first.")
             return
@@ -355,3 +357,16 @@ class MainWindow(QtWidgets.QMainWindow):
     # Exit the application  
     def exit(self):
         self.close()
+
+    def test(self):
+        arr = np.array([[0,1],[2,3]])
+        t1 = np.array([[3000, 500], [1000, 1500]])
+        t2 = np.array([[500,  250], [800,  1000]])
+        dB = np.array([[50,   100], [200,   150]])
+        # Set Attributes
+        self.phantom_viewer.setArray(arr)
+        self.phantom_viewer.getPhantom().set_info(t1, t2, dB)
+        
+        # Set Sequence
+        self.sequence_viewer.setData("./Resources/Sequences/GE_PD.json")
+        

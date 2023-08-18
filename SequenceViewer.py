@@ -6,6 +6,8 @@ import math
 
 # MRI Sequence Diagram Library
 import mrsd
+from MRISequence import *
+from Component import *
 
 # Json library
 import json
@@ -14,15 +16,12 @@ import json
 from Viewer import viewer
 
 # Constants
+## Diagram Titles
 RF_PULSE = "RF"
-RELAXATION = "RELAXATION"
-READOUT = "READOUT"
-SPOILER = "SPOILER"
-PE_MULTI_GRADIENT = "PE_MULTI_GRADIENT"
-PE_GRADIENT = "PE_GRADIENT"
-FE_GRADIENT = "FE_GRADIENT"
-
-RF_TITLE, GSS_TITLE, GPE_TITLE, GFE_TITLE, SIGNAL_TITLE = "RF", "$G_{SS}$", "$G_{PE}$", "$G_{FE}$", "Signal"
+GSS = "$G_{SS}$"
+GPE = "$G_{PE}$"
+GFE = "$G_{FE}$"
+SIGNAL = "Signal"
 
 # Phantom for testing
 class SequenceViewer(viewer):
@@ -35,10 +34,10 @@ class SequenceViewer(viewer):
         super(SequenceViewer, self).__init__(parent, axisExisting, axisColor, title)
         
         # Variables
-        self.timeBasedSequence = list()
+        self.sequence = MRISequence()
         ## Information
         self.name = ""
-        self.abbreviation = ""
+        self.acronym = ""
         ## Intervals
         self.TR = 0
         self.TE = 0
@@ -49,7 +48,7 @@ class SequenceViewer(viewer):
         
         # Initialize the figure
         self.diagram = mrsd.Diagram(
-            self.axes, [RF_TITLE, GSS_TITLE, GPE_TITLE, GFE_TITLE, SIGNAL_TITLE])
+            self.axes, [RF_PULSE, GSS, GPE, GFE, SIGNAL])
                 
     # Set Theme
     def setTheme(self):
@@ -78,8 +77,8 @@ class SequenceViewer(viewer):
 
         #################### Update the parameters with JSON data ####################
         self.name = params.get('name')
-        self.abbreviation = params.get('abbreviation')
-        self.axes.set_title(f"{self.name} ({self.abbreviation})")
+        self.acronym = params.get('acronym')
+        self.axes.set_title(f"{self.name} ({self.acronym})")
         
         # Gradients Axis
         self.ssAxis = params.get('ssAxis')
@@ -89,6 +88,8 @@ class SequenceViewer(viewer):
         # Intervals
         self.TR = params.get('TR')
         self.TE = params.get('TE')
+        self.sequence.set_TR(self.TR)
+        self.sequence.set_TE(self.TE)
 
         ################# Add Intervals #################
         self.add_intervals()
@@ -106,50 +107,45 @@ class SequenceViewer(viewer):
         # Multi PEs
         multi_PEs = PEs.get('multi')
         for multi_PE in multi_PEs:
-            self.add_multi_gradient(multi_PE, GPE_TITLE)
+            self.add_multi_gradient(multi_PE, GPE)
+            
         # Single PEs
         single_PEs = PEs.get('single')
         for single_PE in single_PEs:
-            self.add_gradient(single_PE, GPE_TITLE)
+            self.add_gradient(single_PE, GPE)
 
-        #################### FE ####################
+        ######## FE ########
         # Single PEs
         FEs = components.get('FE')
         for FE in FEs:
-            self.add_gradient(FE, GFE_TITLE)
+            self.add_gradient(FE, GFE)
 
-        #################### Spoiler ####################
+        ######## Spoiler ########
         spoilers = components.get('spoiler')
         for spoiler in spoilers:
-            self.add_spoiler(spoiler, GPE_TITLE)
+            self.add_spoiler(spoiler, GPE)
             
-        #################### readout/Signal ####################
+        ######## readout/Signal ########
         readout = components.get('readout')
         # Readout Parameters
         trajectory = readout.get('trajectory')
-        if trajectory == "Cartesian":
-            # TODO: Draw Cartesian
-            pass
-        elif trajectory == "Radial":
-            # TODO: Draw Radial
-            pass
-        elif trajectory == "Spiral":
-            # TODO: Draw Spiral
-            pass
+        self.sequence.set_trajectory(trajectory)
         
-        signals = readout.get('signals')
+        signals = readout.get('signals') 
         for signal in signals:
             self.add_RO(signal)
 
-        self.orderSequenceBasedOnTime()
+        # Sort & Add Relaxations
+        self.sequence.sort()
+        self.sequence.setup()
         self.draw()
      
     # Clear figure
     def clearData(self):
         super().clearData()
-        self.timeBasedSequence = list()
+        self.sequence = MRISequence()
         self.diagram = mrsd.Diagram(
-            self.axes, [RF_TITLE, GSS_TITLE, GPE_TITLE, GFE_TITLE, SIGNAL_TITLE])
+            self.axes, [RF_PULSE, GSS, GPE, GFE, SIGNAL])
 
     ###############################################
     """Sequence Functions"""
@@ -166,17 +162,17 @@ class SequenceViewer(viewer):
         duration = RF.get('duration')
         
         # Add RF
-        rf_pulse, gradient = self.diagram.selective_pulse(RF_TITLE, 
-                                                          GSS_TITLE, 
+        rf_pulse, gradient = self.diagram.selective_pulse(RF_PULSE, 
+                                                          GSS, 
                                                           duration=duration, 
                                                           pulse_amplitude=flip_angle_rad, 
                                                           center=time, 
                                                           gradient_amplitude=flip_angle_rad/2)
-        self.diagram.annotate(RF_TITLE, x=rf_pulse.end, y=0.2, text=rf"$\alpha$={flip_angle}")
+        self.diagram.annotate(RF_PULSE, x=rf_pulse.end, y=0.2, text=rf"$\alpha$={flip_angle}")
 
-        # Add to time based sequence
-        RF_dict = (time, RF_PULSE, duration, flip_angle)
-        self.timeBasedSequence.append(RF_dict)
+        # Add to sequence        
+        rf_comp = RFComponent(time, duration, flip_angle)
+        self.sequence.add_component(rf_comp)
 
         return rf_pulse, gradient
 
@@ -186,44 +182,45 @@ class SequenceViewer(viewer):
         step = gradient.get('step')
         sign = gradient.get('sign')
         duration = gradient.get('duration')
+        balanced = gradient.get('balanced')
         
         self.diagram.gradient(loc, duration, step/2, duration, center=time)
 
         # Add to time based sequence
-        if loc == GPE_TITLE:
-            gradient_dict = (time, PE_GRADIENT, duration, step, sign)
-        elif loc == GFE_TITLE:
-            gradient_dict = (time, FE_GRADIENT, duration, step, sign)
-
-        self.timeBasedSequence.append(gradient_dict)
+        if loc == GPE:
+            gradient_comp = GradientComponent(time, duration, "phase", sign, balanced)
+        elif loc == GFE:
+            gradient_comp = GradientComponent(time, duration, "frequency", sign, balanced)
+        
+        self.sequence.add_component(gradient_comp)
 
     # Add multi gradient
     def add_multi_gradient(self, gradient, loc):
         time = self.read_time(gradient)
         duration = gradient.get('duration')
-        step = gradient.get('step')
         sign = gradient.get('sign')
+        balanced = gradient.get('balanced')
         
         # Draw multi gradient and annotate        
         self.diagram.multi_gradient(loc, amplitude=0.65, flat_top=self.TR/10, center = time)
         if sign == True:
-            self.diagram.annotate(loc, time, 0.9, r"$\uparrow$" )
+            self.diagram.annotate(loc, time, 0.9, r"$\uparrow$")
         else:
-            self.diagram.annotate(loc, time, 0.9, r"$\downarrow$" )
+            self.diagram.annotate(loc, time, 0.9, r"$\downarrow$")
 
-        # Add to time based sequence
-        pe_multi_dict = (time, PE_MULTI_GRADIENT, duration, step, sign)
-        self.timeBasedSequence.append(pe_multi_dict)
+        # Add to sequence
+        gradient_comp = MultiGradientComponent(time, duration, sign, balanced)
+        self.sequence.add_component(gradient_comp)
 
     # Add readout
     def add_RO(self, signal):
         time = self.read_time(signal)
         duration = signal.get('duration')
-        adc, echo, readout = self.diagram.readout(SIGNAL_TITLE, GFE_TITLE, duration, ramp=0, center=self.TE+1/2*duration, gradient_amplitude=0.5)
+        adc, echo, readout = self.diagram.readout(SIGNAL, GFE, duration, ramp=0, center=self.TE+1/2*duration, gradient_amplitude=0.5)
         
         # Add to time based sequence
-        readout_dict = (time, READOUT, 0)
-        self.timeBasedSequence.append(readout_dict)
+        readout_comp = ReadoutComponent(time, duration)
+        self.sequence.add_component(readout_comp)
 
     # Add intervals
     def add_intervals(self):
@@ -241,8 +238,8 @@ class SequenceViewer(viewer):
         self.diagram.gaussian_pulse(loc, amplitude=1, duration=duration, center=time)
  
         # Add to time based sequence
-        spoiler_dict = (time, SPOILER, 0)
-        self.timeBasedSequence.append(spoiler_dict)
+        spoiler_comp = SpoilerComponent(time, duration)
+        self.sequence.add_component(spoiler_comp)
        
     # Read time
     def read_time(self, item):
@@ -253,34 +250,9 @@ class SequenceViewer(viewer):
         
         return time
     
-    # Set Sequence Based On time
-    def orderSequenceBasedOnTime(self):
-        def get_time(comp):
-            return comp[0]
-
-        # Sort the sequence based on time
-        self.timeBasedSequence.sort(reverse=False, key=get_time)
-        
-        # Add relaxation
-        relaxationList = []
-        for i, item in enumerate(self.timeBasedSequence):
-            if i < len(self.timeBasedSequence)-1:
-                duration = self.timeBasedSequence[i+1][0] - (self.timeBasedSequence[i][0] + self.timeBasedSequence[i][2])
-                if duration > 0:
-                    time = self.timeBasedSequence[i][0]
-                    relaxationList.append((time, RELAXATION, duration))
-        self.timeBasedSequence.extend(relaxationList)
-
-        self.timeBasedSequence.sort(reverse=False, key=get_time)
-        
-        # Add relaxation at the end
-        duration = self.TR-self.timeBasedSequence[-1][0]
-        if duration > 0:
-            self.timeBasedSequence.append((self.timeBasedSequence[-1][0], RELAXATION, duration))
-
     # Get Sequence Based On time
-    def getSequenceBasedOnTime(self):
-        return self.timeBasedSequence
+    def get_sequence(self):
+        return self.sequence
     
     # Reset figure and variables
     def reset(self):

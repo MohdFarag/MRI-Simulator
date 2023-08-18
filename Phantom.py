@@ -113,3 +113,10 @@ class Phantom():
                     self.DeltaB[i][j] = 35
                     
         self.T2s = 1/((1/self.T2) + (1/self.DeltaB))
+    
+    # Set T1, T2, DeltaB
+    def set_info(self, t1, t2, deltaB):
+        self.T1 = t1
+        self.T2 = t2
+        self.DeltaB = deltaB
+        self.T2s = 1/((1/self.T2) + (1/self.DeltaB))
