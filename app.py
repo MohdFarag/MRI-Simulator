@@ -41,7 +41,7 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # Show the window        
         self.phantom_viewer.setConstant(3,0)
-        self.test()
+        self.test1()
 
     # Initialize the UI
     def UI_init(self):
@@ -334,13 +334,11 @@ class MainWindow(QtWidgets.QMainWindow):
     def output_update(self):
         ### Make inverse fourier transform
         result_image = np.fft.ifft2(self.k_space)
-        result_image = np.rot90(result_image, 3)
-        result_image = np.fliplr(result_image)
         
         if self.choose_output_1.isChecked():
-            self.output_viewer_1.drawData(np.abs(result_image), "Output 1")
+            self.output_viewer_1.drawData(np.abs(result_image), title="Output 1")
         elif self.choose_output_2.isChecked():
-            self.output_viewer_2.drawData(np.abs(result_image), "Output 2")
+            self.output_viewer_2.drawData(np.abs(result_image), title="Output 2")
         
         self.run_button.setIcon(QtGui.QIcon("./assets/play.ico"))
         self.run_button.setText("Run")
@@ -358,15 +356,22 @@ class MainWindow(QtWidgets.QMainWindow):
     def exit(self):
         self.close()
 
-    def test(self):
+    def test(self, arr):
+        # Draw Inverse Fourier Transform of the k-space
+        self.output_viewer_2.drawData(np.fft.fftshift(np.abs(np.fft.ifft2(arr))))
+        # Set Sequence
+        self.sequence_viewer.setData("./Resources/Sequences/GE_PD.json")
+        
+    def test1(self):
         arr = np.array([[0,1],[2,3]])
         t1 = np.array([[3000, 500], [1000, 1500]])
         t2 = np.array([[500,  250], [800,  1000]])
         dB = np.array([[50,   100], [200,   150]])
         # Set Attributes
         self.phantom_viewer.setArray(arr)
-        self.phantom_viewer.getPhantom().set_info(t1, t2, dB)
+        self.phantom_viewer.getPhantom().set_specific_info(t1, t2, dB)
+        self.test(arr)
         
-        # Set Sequence
-        self.sequence_viewer.setData("./Resources/Sequences/GE_PD.json")
-        
+    def test2(self, N=16):
+        image = self.phantom_viewer.setSheppLogan(N)
+        self.test(image)

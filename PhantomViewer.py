@@ -63,6 +63,7 @@ class PhantomViewer(viewer):
             
         self.phantom.setImage(image)
         self.drawData(self.phantom.PD, title="Protein Density")
+        return image
 
     # Set Shepp Logan
     def setSheppLogan(self, N:int):       
@@ -75,6 +76,7 @@ class PhantomViewer(viewer):
 
         self.phantom.setImage(image)
         self.drawData(self.phantom.PD, title="Protein Density")
+        return image
 
     # Set constant
     def setConstant(self, N:int, value:int):       
@@ -83,6 +85,7 @@ class PhantomViewer(viewer):
 
         self.phantom.setImage(image)
         self.drawData(self.phantom.PD, title="Protein Density")
+        return image
 
     # Set specific array
     def setArray(self, array):
@@ -114,6 +117,7 @@ class PhantomViewer(viewer):
 
         self.phantom.setImage(image)
         self.drawData(self.phantom.PD, title="Protein Density")
+        return image
         
     # Get phantom
     def getPhantom(self):
@@ -139,7 +143,7 @@ class PhantomViewer(viewer):
 
     # Reset magnetization vector
     def resetM(self):
-        self.phantom.resetM()
+        self.phantom.reset_M()
         
     ###############################################
     """plt Functions"""

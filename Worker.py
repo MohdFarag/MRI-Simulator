@@ -43,7 +43,7 @@ class SequenceWorker(QObject):
         ############ Simulate the sequence ############
 
         # Generate k space
-        self.k_space = np.zeros((N, N), dtype=complex) # Initialize an NxN complex array with zeros        
+        self.k_space = np.zeros((N, N), dtype=complex) # Initialize an NxN complex array with zeros
         angles = np.linspace(-180, 180, N, endpoint=False) # Angles that will be used to generate the phase shifts
         
         progress_counter = 0
@@ -51,7 +51,6 @@ class SequenceWorker(QObject):
         
         # Loop over the phase encoding gradient
         while pe_gradient < N and self._isRunning:
-            print("Phase encoding gradient: ", pe_gradient)
             # Reset the frequency encoding gradient
             fe_gradient = 0
             # Loop over the sequence components
@@ -62,13 +61,12 @@ class SequenceWorker(QObject):
                     flip_angle = component.angle
                     # Apply the RF pulse
                     self.apply_on_phantom(self.rotation, flip_angle, X_AXIS)
-                    print(self.phantom.M)
-                
+
                 elif type(component) == RelaxationComponent:
                     # If Component Type is relaxation
                     duration = component.duration
                     self.relaxation_phantom(duration)      
-                                                                      
+
                 elif type(component) == MultiGradientComponent:
                     # If component type is multi gradient
                     sign = component.sign
@@ -76,6 +74,8 @@ class SequenceWorker(QObject):
                     # Apply the phase encoding gradient
                     # self.apply_phase_encoding(angles, pe_gradient, sign)
                     # Increment the phase encoding gradient
+                    # pe_gradient += 1                        
+
                     
                 elif type(component) == GradientComponent:
                     # If component type is gradient
@@ -83,10 +83,7 @@ class SequenceWorker(QObject):
                     sign = component.sign
                     balanced = component.balanced
                     if encoding == "phase":
-                        # Apply the phase encoding gradient
-                        self.apply_phase_encoding(angles, pe_gradient, sign)
-                        # pe_gradient += 1
-                        
+                        pass
                     else:
                         # Apply the frequency encoding gradient
                         pass
@@ -99,14 +96,14 @@ class SequenceWorker(QObject):
                     # If component type is readout
                     while fe_gradient < N and pe_gradient < N:
                         # Apply frequency encoding
-                        self.apply_frequency_encoding(angles, fe_gradient, pe_gradient)
-                        
+                        copied_phantom = self.apply_frequency_encoding(angles, fe_gradient, pe_gradient)
+                        # Read the signal
+                        self.k_space[fe_gradient][pe_gradient] = np.sum(copied_phantom.getMxy())
                         # Increment the frequency encoding gradient
                         fe_gradient += 1
-                        
                     # Increment the phase encoding gradient
-                    pe_gradient += 1
-    
+                    pe_gradient += 1 
+                    
                     # Update the k-space matrix
                     self.k_space_update.emit(self.k_space)
                     self.k_space_viewer.drawData2(np.abs(self.k_space))
@@ -179,7 +176,7 @@ class SequenceWorker(QObject):
         N = self.phantom.width
         for x in range(N):
             for y in range(N):
-                self.phantom.M[x][y] = self.relaxation(self.phantom.M[x][y], t, self.phantom.T1[x][y], self.phantom.T2[x][y], self.phantom.PD[x][y])
+                self.phantom.M[x][y] = self.relaxation(self.phantom.M[x][y], t, self.phantom.T1[x][y], self.phantom.T2s[x][y], self.phantom.PD[x][y])
    
     # Apply a spoiler gradient
     def spoiler(self, magnetization_vector):
@@ -191,7 +188,7 @@ class SequenceWorker(QObject):
     def apply_on_phantom(self, func, *args):
         for x in range(self.phantom.width):
             for y in range(self.phantom.width):
-                self.phantom.M[x][y] = np.round(func(self.phantom.M[x][y], *args), 2)
+                self.phantom.M[x][y] = func(self.phantom.M[x][y], *args)
     
     # Apply a phase encoding gradient
     def apply_phase_encoding(self, angles, pe_gradient, sign=1):
@@ -210,12 +207,13 @@ class SequenceWorker(QObject):
         for x in range(N):
             for y in range(N):
                 # Set the rotation angle
-                rotation_angle_pe = angles[pe_gradient] * y
-                rotation_angle_fe = angles[fe_gradient] * x
-
+                rotation_angle_pe = angles[pe_gradient] * y                            
                 # Apply the rotation
                 copied_phantom.M[x][y] = self.rotation(copied_phantom.M[x][y], rotation_angle_pe, Z_AXIS)
-                copied_phantom.M[x][y] = self.rotation(copied_phantom.M[x][y], rotation_angle_fe, Z_AXIS)
                 
-                # Read the signal
-                self.k_space[pe_gradient][fe_gradient] += copied_phantom.getMxy()[x][y]
+                # Set the rotation angle
+                rotation_angle_fe = angles[fe_gradient] * x
+                # Apply the rotation
+                copied_phantom.M[x][y] = self.rotation(copied_phantom.M[x][y], rotation_angle_fe, Z_AXIS)
+        
+        return copied_phantom

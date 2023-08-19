@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
+COLOR_MAP = plt.cm.Greys_r
+
 class viewer(FigureCanvasQTAgg):
     """Viewer Class
 
@@ -74,20 +76,28 @@ class viewer(FigureCanvasQTAgg):
         self.clearData()
                         
     # Draw image with matplotlib
-    def drawData(self, image, title="Blank", cmap=plt.cm.Greys_r, origin='upper', a_min=0, a_max=255):
+    def drawData(self, image, cmap=COLOR_MAP, title=None, origin=None):
+        if title is None and origin is None:
+            self.drawData2(image, cmap)
+        else:
+            if title is None:
+                title = "Blank"
+            if origin is None:
+                origin = 'upper'
+            self.drawData1(image, cmap, title, origin)
+    
+    # Draw image with matplotlib
+    def drawData1(self, image, cmap=COLOR_MAP, title="Blank", origin='upper'):
         # Clear figure
         self.clearData()
-         
-        # Scale image
-        image = scale_image(image, a_min, a_max)
-        
+                 
         # Draw image
         self.axes.set_title(title, fontsize = 16)
-        self.axes.imshow(image, cmap=cmap, origin=origin, vmin=a_min, vmax=a_max)
+        self.axes.imshow(image, cmap=cmap, origin=origin)
         self.draw()
 
-    # Draw image with matplotlib
-    def drawData2(self, image, cmap=plt.cm.Greys_r):
+    # Draw image with matplotlib without title
+    def drawData2(self, image, cmap=COLOR_MAP):
         # Draw image
         self.axes.imshow(image, cmap=cmap)
         self.draw()

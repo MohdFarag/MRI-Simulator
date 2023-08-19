@@ -37,7 +37,7 @@ class Phantom():
         self.T2s = np.zeros(image.shape)                     # T2*
         self.DeltaB = np.zeros(image.shape)                  # Delta B
         
-        self.setRandomData()
+        self.set_random_data()
     
     # Get Mz
     def getMz(self):
@@ -71,13 +71,13 @@ class Phantom():
         return copy_phantom
     
     # Reset Magnetization Vector
-    def resetM(self):
+    def reset_M(self):
         for i in range(self.width):
             for j in range(self.height):
                 self.M[i][j] = (0, 0, self.PD[i][j])
                 
     # Set Random Data                      
-    def setRandomData(self):
+    def set_random_data(self):
         for i in range(self.width):
             for j in range(self.height):
                 self.M[i][j] = (0, 0, self.PD[i][j])
@@ -93,7 +93,7 @@ class Phantom():
                     self.DeltaB[i][j] = 5
                 
                 elif 51 <= self.PD[i][j] < 76:
-                    self.T1[i][j] = 680
+                    self.T1[i][j] = 580
                     self.T2[i][j] = 90
                     self.DeltaB[i][j] = 12
                 
@@ -103,8 +103,8 @@ class Phantom():
                     self.DeltaB[i][j] = 0.03
                                     
                 elif 101 <= self.PD[i][j] < 200:
-                    self.T1[i][j] = 3000
-                    self.T2[i][j] = 3000
+                    self.T1[i][j] = 2500
+                    self.T2[i][j] = 2000
                     self.DeltaB[i][j] = 195
 
                 else:
@@ -115,7 +115,7 @@ class Phantom():
         self.T2s = 1/((1/self.T2) + (1/self.DeltaB))
     
     # Set T1, T2, DeltaB
-    def set_info(self, t1, t2, deltaB):
+    def set_specific_info(self, t1, t2, deltaB):
         self.T1 = t1
         self.T2 = t2
         self.DeltaB = deltaB

@@ -49,9 +49,9 @@ class ImageViewer(viewer):
         # Draw the image        
         self.drawData(self.image, title=self.title)
         
-    def drawData(self, image, title="Blank", cmap=plt.cm.Greys_r):
+    def drawData(self, image, cmap=plt.cm.Greys_r, title=None):
         self.image = image
-        super().drawData(image, title, cmap)
+        super().drawData(image, cmap=cmap, title=title)
 
     def drawData2(self, image, cmap=plt.cm.Greys_r):
         self.image = image
@@ -79,7 +79,7 @@ class ImageViewer(viewer):
             
             # Set Text
             index = f"{x} , {y}" # Index
-            intensity = np.round(self.image[x][y],2) # Image intensity
+            intensity = np.round(self.image[x][y],4) # Image intensity
             text = f"{index} = {intensity}"
             self.annot.set_text(text)
         else:
