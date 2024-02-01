@@ -1,0 +1,30 @@
+{
+    "TR": 5,
+    "TE": 1,
+    "SPOILER": true,
+    "RF": [
+        {
+            "time": 0,
+            "duration": 0.3,
+            "flip_angle": 90
+        },
+        {
+            "time": "TE/2",
+            "duration": 0.3,
+            "flip_angle": 180
+        }
+    ],
+    "gradient": [
+    ],
+    "multi_gradient": [
+        {
+            "time": 0.5,
+            "axis": "y",
+            "sign": true
+        }
+    ],
+    "readout": {
+        "duration": 0.5,
+        "axis": "x"
+    }
+}

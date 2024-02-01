@@ -10,14 +10,9 @@ import matplotlib.image as mpimg
 from Viewer import viewer
 
 # Phantom for testing
-from Phantom import Phantom
+from Phantom import *
 from phantominator import shepp_logan
 
-PD_ATTRIBUTE = 0
-T1_ATTRIBUTE = 1
-T2_ATTRIBUTE = 2
-T2S_ATTRIBUTE = 3
-DELTA_ATTRIBUTE = 4
 
 class PhantomViewer(viewer):
     """Phantom Viewer Class
@@ -50,20 +45,23 @@ class PhantomViewer(viewer):
     ###############################################
 
     # Set image
-    def setData(self, path:str):       
+    def setData(self, path:str, ext:str):
         super().setData(path)
 
         # Reading the image
-        image = mpimg.imread(path)
-
-        if image.ndim > 2:
-            image = image[:,:,0]
+        if ext == "npy":
+            array = np.load(path)
+            self.phantom.set_numpy(array)            
         else:
-            image = image
-            
-        self.phantom.setImage(image)
+            array = mpimg.imread(path)
+            if array.ndim > 2:
+                array = array[:,:,0]
+            else:
+                array = array
+            self.phantom.setImage(array)
+        
         self.drawData(self.phantom.PD, title="Protein Density")
-        return image
+        return array
 
     # Set Shepp Logan
     def setSheppLogan(self, N:int):       
@@ -125,16 +123,14 @@ class PhantomViewer(viewer):
 
     # Change attribute
     def changeAttribute(self, attribute):
-        if attribute == PD_ATTRIBUTE:
+        if attribute == PD:
             self.drawData(self.phantom.PD, title="Protein Density")
-        elif attribute == T1_ATTRIBUTE:
-            self.drawData(self.phantom.T1, title="T1")
-        elif attribute == T2_ATTRIBUTE:
-            self.drawData(self.phantom.T2, title="T2")
-        elif attribute == T2S_ATTRIBUTE:
-            self.drawData(self.phantom.T2s, title="T2*")
-        elif attribute == DELTA_ATTRIBUTE:
-            self.drawData(self.phantom.DeltaB, title="Delta B")
+        elif attribute == T1:
+            self.drawData(self.phantom.t1, title="T1")
+        elif attribute == T2:
+            self.drawData(self.phantom.t2, title="T2")
+        elif attribute == T2_STAR:
+            self.drawData(self.phantom.t2_star, title="T2*")
                     
     # Reset figure and variables
     def reset(self):
@@ -165,12 +161,11 @@ class PhantomViewer(viewer):
             
             MText = f"(x,y,z)=({round(self.phantom.M[x][y][0],2)}, {round(self.phantom.M[x][y][1],2)}, {round(self.phantom.M[x][y][2],2)})"
             pdText = f"PD={round(self.phantom.PD[x][y],2)}"
-            t1Text = f"T1={round(self.phantom.T1[x][y],2)}"
-            t2Text = f"T2={round(self.phantom.T2[x][y],2)}"
-            t2sText = f"T2*= {round(self.phantom.T2s[x][y],2)}"
-            deltaBText = f"Delta B={round(self.phantom.DeltaB[x][y],2)}"
+            t1Text = f"T1={round(self.phantom.t1[x][y],2)}"
+            t2Text = f"T2={round(self.phantom.t2[x][y],2)}"
+            t2sText = f"T2*= {round(self.phantom.t2_star[x][y],2)}"
 
-            text = f"{MText}\n{pdText}\n{t1Text}\n{t2Text}\n{t2sText}\n{deltaBText}"
+            text = f"{MText}\n{pdText}\n{t1Text}\n{t2Text}\n{t2sText}"
             self.annot.set_text(text)
         else:
             self.annot.set_visible(False)

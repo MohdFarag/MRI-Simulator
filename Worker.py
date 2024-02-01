@@ -75,8 +75,7 @@ class SequenceWorker(QObject):
                     # self.apply_phase_encoding(angles, pe_gradient, sign)
                     # Increment the phase encoding gradient
                     # pe_gradient += 1                        
-
-                    
+              
                 elif type(component) == GradientComponent:
                     # If component type is gradient
                     encoding = component.encoding
@@ -96,7 +95,7 @@ class SequenceWorker(QObject):
                     # If component type is readout
                     while fe_gradient < N and pe_gradient < N:
                         # Apply frequency encoding
-                        copied_phantom = self.apply_frequency_encoding(angles, fe_gradient, pe_gradient)
+                        copied_phantom = self.readout(angles, fe_gradient, pe_gradient)
                         # Read the signal
                         self.k_space[fe_gradient][pe_gradient] = np.sum(copied_phantom.getMxy())
                         # Increment the frequency encoding gradient
@@ -118,7 +117,7 @@ class SequenceWorker(QObject):
         self._isRunning = False
 
     # Apply an RF pulse to a magnetization vector
-    def rotation(self, magnetization_vector:tuple, flip_angle_deg:float, axis:str="x"):
+    def rotation(self, magnetization_vector:tuple, flip_angle_deg:float, axis:str=X_AXIS):
         # Convert flip angle from degrees to radians
         flip_angle_rad = np.radians(flip_angle_deg)
 
@@ -126,7 +125,6 @@ class SequenceWorker(QObject):
         sin_theta = np.sin(flip_angle_rad)
         cos_theta = np.cos(flip_angle_rad)
         
-        axis = axis.lower() # Convert axis to lowercase        
         if axis == X_AXIS:
             # Construct the rotation matrix around x-axis
             rotation_matrix = np.array([[1,             0,                  0],
@@ -145,6 +143,8 @@ class SequenceWorker(QObject):
 
         # Apply rotation to the magnetization vector
         new_magnetization_vector = np.matmul(rotation_matrix, magnetization_vector)
+        # new_magnetization_vector = np.dot(rotation_matrix, magnetization_vector)
+        
         return new_magnetization_vector
     
     # Simulate T1 and T2 relaxation of magnetization
@@ -176,9 +176,9 @@ class SequenceWorker(QObject):
         N = self.phantom.width
         for x in range(N):
             for y in range(N):
-                self.phantom.M[x][y] = self.relaxation(self.phantom.M[x][y], t, self.phantom.T1[x][y], self.phantom.T2s[x][y], self.phantom.PD[x][y])
+                self.phantom.M[x][y] = self.relaxation(self.phantom.M[x][y], t, self.phantom.t1[x][y], self.phantom.t2_star[x][y], self.phantom.PD[x][y])
    
-    # Apply a spoiler gradient
+    # TODO: Apply a spoiler gradient
     def spoiler(self, magnetization_vector):
         magnetization_vector[0] = 0
         magnetization_vector[1] = 0
@@ -190,7 +190,7 @@ class SequenceWorker(QObject):
             for y in range(self.phantom.width):
                 self.phantom.M[x][y] = func(self.phantom.M[x][y], *args)
     
-    # Apply a phase encoding gradient
+    # TODO: Apply a phase encoding gradient
     def apply_phase_encoding(self, angles, pe_gradient, sign=1):
         N = self.phantom.width
         for x in range(N):
@@ -200,8 +200,8 @@ class SequenceWorker(QObject):
                 # Apply the rotation
                 self.phantom.M[x][y] = self.rotation(self.phantom.M[x][y], rotation_angle_pe, Z_AXIS)
     
-    # Apply a frequency encoding gradient
-    def apply_frequency_encoding(self, angles, fe_gradient, pe_gradient):
+    # TODO: Apply a frequency encoding gradient
+    def readout(self, angles, fe_gradient, pe_gradient):
         copied_phantom = self.phantom.copy()
         N = self.phantom.width
         for x in range(N):

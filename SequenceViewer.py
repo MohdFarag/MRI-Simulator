@@ -224,10 +224,10 @@ class SequenceViewer(viewer):
 
     # Add intervals
     def add_intervals(self):
-        if self.TE != 0 :
-            self.diagram.interval(0, self.TE, -0.5, "TE")
-        if self.TR != 0 :
-            self.diagram.interval(0, self.TR, -1.0, "TR")
+        if self.TE != 0:
+            self.diagram.interval(0, self.TE/4, -0.8, f"TE={self.TE}")
+        if self.TR != 0:
+            self.diagram.interval(0, self.TR/4, -1.2, f"TR={self.TR}")
     
     # Add Spoiler
     def add_spoiler(self, spoiler, loc):

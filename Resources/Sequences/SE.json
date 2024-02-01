@@ -1,0 +1,54 @@
+{
+    "name": "Spin Echo",
+    "acronym": "SE",
+    "TR": 250,
+    "TE": 90,
+    "ssAxis": "z",
+    "peAxis": "y",
+    "feAxis": "x",
+    "component": {
+        "RF": [
+            {
+                "time": 0,
+                "flipAngle": 90,
+                "duration": 10
+            },
+            {
+                "time": "TE/2",
+                "flipAngle": 180,
+                "duration": 10
+            }
+        ],
+ 
+        "PE": {
+            "multi": [
+                {
+                    "time": "TE",
+                    "step": 1,
+                    "sign": true,
+                    "duration": 10,
+                    "balanced": false
+                }
+            ],
+            "single": [
+            ]
+        },
+
+        "FE": [
+            
+        ],
+
+        "spoiler": [
+        ],
+        
+        "readout": {
+            "trajectory": "CARTESIAN",
+            "signals": [
+                {
+                    "time": "TE", 
+                    "duration": 20
+                }
+            ]
+        }
+    }
+}

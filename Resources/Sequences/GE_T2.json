@@ -1,0 +1,49 @@
+{
+    "name": "Gradient Echo",
+    "acronym": "GE",
+    "TR": 2500,
+    "TE": 150,
+    "ssAxis": "z",
+    "peAxis": "y",
+    "feAxis": "x",
+    "component": {
+        "RF": [
+            {
+                "time": 0,
+                "flipAngle": 90,
+                "duration": 10
+            }
+        ],
+ 
+        "PE": {
+            "multi": [
+                {
+                    "time": 130,
+                    "step": 1,
+                    "sign": true,
+                    "duration": 10,
+                    "balanced": false
+                }
+            ],
+            "single": [
+            ]
+        },
+
+        "FE": [
+            
+        ],
+
+        "spoiler": [
+        ],
+        
+        "readout": {
+            "trajectory": "CARTESIAN",
+            "signals": [
+                {
+                    "time": "TE", 
+                    "duration": 20
+                }
+            ]
+        }
+    }
+}

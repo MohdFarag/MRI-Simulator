@@ -40,8 +40,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.connect()
         
         # Show the window        
-        self.phantom_viewer.setConstant(3,0)
-        self.test1()
+        # self.phantom_viewer.setConstant(3,0)
+        # self.test1()
 
     # Initialize the UI
     def UI_init(self):
@@ -69,28 +69,34 @@ class MainWindow(QtWidgets.QMainWindow):
         ##### Selector
         self.mode_selector = QtWidgets.QComboBox()
         self.mode_selector.addItems(["Protein Density", "T1", "T2", "T2*", "Delta B"])
-        selector_layout.addWidget(self.mode_selector,2)
+        selector_layout.addWidget(self.mode_selector,4)
         ##### Reset Button
         self.reset_M_Btn = QtWidgets.QPushButton("Reset Magnetization")
         selector_layout.addWidget(self.reset_M_Btn,1)
-        viewer_layout.addLayout(selector_layout)
-        #### Phantom Viewer
+        viewer_layout.addLayout(selector_layout,1)
+        
+        #### Lower Layout
+        lower_layout = QtWidgets.QHBoxLayout()
+
+        ##### Phantom Buttons Layout
+        self.phantom_buttons_layout = QtWidgets.QVBoxLayout()
+        ###### Shepp Logan Button
+        self.shepp_logan_button = QtWidgets.QPushButton("Shepp Logan")
+        self.phantom_buttons_layout.addWidget(self.shepp_logan_button)
+        ###### Gradient Button
+        self.gradient_button = QtWidgets.QPushButton("Gradient")
+        self.phantom_buttons_layout.addWidget(self.gradient_button)
+        ###### Constant Button
+        self.const_button = QtWidgets.QPushButton("Constant")
+        self.phantom_buttons_layout.addWidget(self.const_button)
+        lower_layout.addLayout(self.phantom_buttons_layout, 1)
+        
+        ##### Phantom Viewer
         self.phantom_viewer = PhantomViewer(title="Phantom")
         self.phantom_viewer.setCursor(QtGui.QCursor())
         self.phantom_viewer.setFocusPolicy(QtCore.Qt.ClickFocus)
-        viewer_layout.addWidget(self.phantom_viewer)
-        #### Phantom Buttons Layout
-        self.phantom_buttons_layout = QtWidgets.QHBoxLayout()
-        ##### Shepp Logan Button
-        self.shepp_logan_button = QtWidgets.QPushButton("Shepp Logan")
-        self.phantom_buttons_layout.addWidget(self.shepp_logan_button)
-        ##### Gradient Button
-        self.gradient_button = QtWidgets.QPushButton("Gradient")
-        self.phantom_buttons_layout.addWidget(self.gradient_button)
-        ##### Constant Button
-        self.const_button = QtWidgets.QPushButton("Constant")
-        self.phantom_buttons_layout.addWidget(self.const_button)
-        viewer_layout.addLayout(self.phantom_buttons_layout)
+        lower_layout.addWidget(self.phantom_viewer, 20)
+        viewer_layout.addLayout(lower_layout, 20)
         
         ###############################
 
@@ -194,12 +200,15 @@ class MainWindow(QtWidgets.QMainWindow):
     def connect(self):
         # Mode Selector
         self.mode_selector.currentIndexChanged.connect(self.change_mode)
+        
         # Run Button
         self.run_button.clicked.connect(self.run_button_event)
+        
         # Phantom Buttons
         self.shepp_logan_button.clicked.connect(lambda: self.phantom_viewer.setSheppLogan(32))
         self.gradient_button.clicked.connect(lambda: self.phantom_viewer.setGradient(32))
         self.const_button.clicked.connect(lambda: self.phantom_viewer.setConstant(32,120))
+        
         # Reset Mag. Button
         self.reset_M_Btn.clicked.connect(self.phantom_viewer.resetM)
 
@@ -224,13 +233,14 @@ class MainWindow(QtWidgets.QMainWindow):
     def open_phantom(self):
         file_dialog = QFileDialog()
         file_dialog.setFileMode(QFileDialog.ExistingFile)
-        file_dialog.setNameFilter("Image Files (*.png *.jpg *.jpeg *.svg *.webp)")
+        file_dialog.setNameFilter("Image Files (*.png *.jpg *.jpeg *.svg *.webp);;Numpy files (*.npy)")
         if file_dialog.exec_():
             filenames = file_dialog.selectedFiles()
             if len(filenames) > 0:
                 filename = filenames[0]
+                ext = filename.split('.')[1]
                 # try:
-                self.load_phantom(filename)
+                self.phantom_viewer.setData(filename, ext)
                 # except Exception as e:
                 #     print(e)
                 #     QtWidgets.QMessageBox.critical(self, "Error", "Unable to open the phantom file.")
@@ -244,20 +254,12 @@ class MainWindow(QtWidgets.QMainWindow):
             filenames = file_dialog.selectedFiles()
             if len(filenames) > 0:
                 filename = filenames[0]
-                # try:
-                self.load_sequence(filename)
-                # except Exception as e:
-                #     print(e)
-                #     QtWidgets.QMessageBox.critical(self, "Error", "Unable to open the sequence file.")                    
+                try:
+                    self.sequence_viewer.setData(filename)
+                except Exception as e:
+                    print(e)
+                    QtWidgets.QMessageBox.critical(self, "Error", "Unable to open the sequence file.")                    
 
-    # Load Phantom
-    def load_phantom(self, filename):
-        self.phantom_viewer.setData(filename)
-
-    # Load Sequence
-    def load_sequence(self, filename):
-        self.sequence_viewer.setData(filename)
-    
     # Change mode showed
     def change_mode(self, index):
         self.phantom_viewer.changeAttribute(index)
@@ -333,12 +335,16 @@ class MainWindow(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot()    
     def output_update(self):
         ### Make inverse fourier transform
-        result_image = np.fft.ifft2(self.k_space)
-        
-        if self.choose_output_1.isChecked():
-            self.output_viewer_1.drawData(np.abs(result_image), title="Output 1")
-        elif self.choose_output_2.isChecked():
-            self.output_viewer_2.drawData(np.abs(result_image), title="Output 2")
+        print(self.k_space)
+        if self.k_space:
+            result_image = np.fft.ifft2(self.k_space)
+            if self.choose_output_1.isChecked():
+                self.output_viewer_1.drawData(np.abs(result_image), title="Output 1")
+            elif self.choose_output_2.isChecked():
+                self.output_viewer_2.drawData(np.abs(result_image), title="Output 2")
+        else:
+            QtWidgets.QMessageBox.critical(self, "Error", "Please, upload the phantom.")
+
         
         self.run_button.setIcon(QtGui.QIcon("./assets/play.ico"))
         self.run_button.setText("Run")
@@ -346,8 +352,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.choose_output_1.setEnabled(True)
         self.choose_output_2.setEnabled(True)
         self.running = False
-
-    """MRI Functions"""           
+    
     # Close the application
     def closeEvent(self, QCloseEvent):
         super().closeEvent(QCloseEvent)
@@ -369,7 +374,7 @@ class MainWindow(QtWidgets.QMainWindow):
         dB = np.array([[50,   100], [200,   150]])
         # Set Attributes
         self.phantom_viewer.setArray(arr)
-        self.phantom_viewer.getPhantom().set_specific_info(t1, t2, dB)
+        self.phantom_viewer.getPhantom().set_information(t1, t2, dB)
         self.test(arr)
         
     def test2(self, N=16):

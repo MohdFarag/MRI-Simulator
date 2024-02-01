@@ -1,0 +1,43 @@
+{
+    "TR": 15,
+    "TE": 7.5,
+    "SPOILER": false,
+    "RF": [
+        {
+            "time": 0,
+            "duration": 0.8,
+            "flip_angle": 90
+        }
+    ],
+    "gradient": [
+        {
+            "time": "TR",
+            "duration": 1,
+            "axis": "z",
+            "angle": 180,
+            "amplitude": -1
+        },
+        {
+            "time": 14,
+            "duration": 1,
+            "axis": "x",
+            "amplitude": -0.5
+        }
+    ],
+    "multi_gradient": [
+        {
+            "time": 0,
+            "axis": "y",
+            "sign": true
+        },
+        {
+            "time": 14,
+            "axis": "y",
+            "sign": false
+        }
+    ],
+    "readout": {
+        "duration": 2,
+        "axis": "x"
+    }
+}

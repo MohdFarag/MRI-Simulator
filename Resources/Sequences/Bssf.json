@@ -1,0 +1,63 @@
+{
+    "name": "Balanced Steady State Free Precession",
+    "acronym": "BSSFP",
+    "TR": 1.5,
+    "TE": 0.4,
+    "ssAxis": "z",
+    "peAxis": "y",
+    "feAxis": "x",
+    "component": {
+        "RF": [
+            {
+                "time": 0,
+                "flipAngle": 90,
+                "duration": 0.2
+            },
+            {
+                "time": "TR",
+                "flipAngle": -90,
+                "duration": 0.2
+            }
+        ],
+ 
+        "PE": {
+            "multi": [
+                {
+                    "time": 0.2,
+                    "step": 1,
+                    "sign": true,
+                    "duration": 0.2        
+                },
+                {
+                    "time": 1.2,
+                    "step": 1,
+                    "sign": false,
+                    "duration": 0.2        
+                }
+            ],
+            "single": [
+            ]
+        },
+
+        "FE": [
+            {
+                "time": 1.2,
+                "step": -1,
+                "duration": 0.5
+            }
+        ],
+
+        "spoiler": [
+        ],
+        
+        "readout": {
+            "trajectory": "CARTESIAN",
+            "signals": [
+                {
+                    "time": "TE", 
+                    "duration": 0.5       
+                }
+            ]
+        }
+    }
+}

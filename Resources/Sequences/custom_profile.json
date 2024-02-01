@@ -1,0 +1,63 @@
+{
+    "name": null,
+    "acronym": null,
+    "ssAxis": null,
+    "peAxis": null,
+    "feAxis": null,
+    "TR": null,
+    "TE": null,
+    "component": {
+        "RF": [
+            {
+                "time": null,
+                "flipAngle": null,
+                "duration": null
+            }
+        ],
+ 
+        "PE": {
+            "multi": [
+                {
+                    "time": null,
+                    "step": null,
+                    "sign": null,
+                    "duration": null        
+                }
+            ],
+            "single": [
+                {
+                    "time": null,
+                    "step": null,
+                    "sign": null,
+                    "duration": null
+                }
+            ]
+        },
+
+        "FE":  [
+            {
+                "time": null,
+                "step": null,
+                "sign": null,
+                "duration": null,
+                "balanced": null
+            }
+        ],
+
+        "spoiler": [
+            {
+                "time": null
+            }
+        ],
+        
+        "readout": {
+            "trajectory": "CARTESIAN",
+            "signals": [
+                {
+                    "time": null, 
+                    "duration": null        
+                }
+            ]
+        }
+    }
+}
