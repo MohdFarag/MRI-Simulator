@@ -1,6 +1,6 @@
 # MRI Simulator
 
-![Project Image](./Docs/image3-copy.png)
+![Project Image](./Docs/cover.webp)
 
 > Magnetic Resonance Imaging Simulator.
 
